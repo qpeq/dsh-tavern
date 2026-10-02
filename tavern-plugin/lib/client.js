@@ -9764,7 +9764,7 @@ function subscribeTavernHostTheme(win, listener) {
 				area.style.height = "auto";
 				area.style.height = area.scrollHeight + 2 + "px";
 			}, [value]);
-			React.useEffect(() => { if (autoFocus && ref.current) ref.current.focus({ preventScroll: true }); }, []);
+			React.useEffect(() => { if (autoFocus && ref.current && ref.current.offsetParent !== null) { ref.current.focus({ preventScroll: true }); ref.current.setSelectionRange(0, 0); } }, []);
 			return React.createElement("textarea", { ref, value, disabled, "aria-label": label, rows: 3, onChange, onKeyDown,
 				style: { display: "block", width: "100%", boxSizing: "border-box", resize: "none", overflow: "hidden", font: "inherit", lineHeight: "inherit", color: "inherit",
 					background: "var(--dsw-specific-input-major, transparent)", border: "1px solid var(--dsh-tavern-accent, #c96)", borderRadius: "8px", padding: "10px 12px" } });
@@ -9772,6 +9772,17 @@ function subscribeTavernHostTheme(win, listener) {
 
 		function InlineBodyEditor({ panel }) {
 			const h = React.createElement;
+			const regionRef = React.useRef(null);
+			// Open with the reply's start at the top of the chat, not wherever the bottom-anchored view left it.
+			// Repeat on the next frames: the chat viewport may re-anchor to the bottom as the boxes grow.
+			React.useLayoutEffect(() => {
+				const region = regionRef.current;
+				if (!region || region.offsetParent === null) return;
+				const top = () => region.scrollIntoView({ block: "start", behavior: "auto" });
+				top();
+				let frames = 0, id = requestAnimationFrame(function again() { top(); if (++frames < 6) id = requestAnimationFrame(again); });
+				return () => cancelAnimationFrame(id);
+			}, []);
 			async function save() {
 				if (panel.busy) return;
 				setInlineBodyEdit({ ...panel, busy: true, error: "" });
@@ -9788,7 +9799,7 @@ function subscribeTavernHostTheme(win, listener) {
 				else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); save(); }
 			}
 			let textIndex = 0, focused = false;
-			return h("div", { className: "dsh-tavern-inline-body-edit", role: "region", "aria-label": "Edit reply", style: { display: "grid", gap: "10px" } },
+			return h("div", { ref: regionRef, className: "dsh-tavern-inline-body-edit", role: "region", "aria-label": "Edit reply", style: { display: "grid", gap: "10px", scrollMarginTop: "8px" } },
 				panel.edit.parts.map((part, index) => {
 					if (part.kind === "html") return h("div", { key: index, className: "dsh-tavern-question-sub", style: { fontSize: "12px", opacity: .7 } }, "(HTML block kept as is)");
 					if (part.kind !== "text") return null;
