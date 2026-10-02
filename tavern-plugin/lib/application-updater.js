@@ -12,12 +12,12 @@ import { createProfileDataStore } from './profile-data-store.js'
 const STATUS_FILE = 'update-status.json'
 const RELEASE_FILE = '.dsh-tavern-release.json'
 const RUNNING_TIMEOUT_MS = 15 * 60 * 1000
-const VERSION_URL = 'https://raw.githubusercontent.com/flizzywine/dsh-tavern/main/package.json'
-const COMMIT_URL = 'https://api.github.com/repos/flizzywine/dsh-tavern/commits/main'
-const COMPARE_URL = 'https://api.github.com/repos/flizzywine/dsh-tavern/compare'
+const VERSION_URL = 'https://raw.githubusercontent.com/qpeq/dsh-tavern/main/package.json'
+const COMMIT_URL = 'https://api.github.com/repos/qpeq/dsh-tavern/commits/main'
+const COMPARE_URL = 'https://api.github.com/repos/qpeq/dsh-tavern/compare'
 const execFileAsync = promisify(execFile)
 const UPDATE_CHECK_POLICY = 4
-const CDN_METADATA_URL = 'https://cdn.jsdelivr.net/gh/flizzywine/dsh-tavern@main/dsh-tavern-runtime.json'
+const CDN_METADATA_URL = 'https://cdn.jsdelivr.net/gh/qpeq/dsh-tavern@main/dsh-tavern-runtime.json'
 const RUNTIME_FILES = new Set(['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'cordis.patch.yml', 'install.ps1', 'install.sh'])
 const RUNTIME_DIRECTORIES = ['bin/', 'config/', 'presets/', 'tavern-plugin/', 'patches/']
 
@@ -458,7 +458,7 @@ export function createApplicationUpdater(options) {
       if (manifest.dsh?.profile?.bundles?.includes('dsh-profile-tavern')) {
         return {
           phase: 'package-managed', host: await host(), ...await localIdentity(),
-          updateCommand: 'dsh plugin --profile tavern add github:flizzywine/dsh-tavern',
+          updateCommand: 'dsh plugin --profile tavern add github:qpeq/dsh-tavern',
         }
       }
     } catch (error) {
