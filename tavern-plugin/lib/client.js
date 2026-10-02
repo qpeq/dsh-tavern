@@ -10214,7 +10214,8 @@ function subscribeTavernHostTheme(win, listener) {
                     && prepared?.lifecycleRevision === Number(helper?.lifecycleRevision || 0)
                     && typeof prepared.text === "string" && prepared.text.trim()
                     ? React.createElement(TavernPreparedScriptMessage, {key:props.sessionId+":"+prepared.lifecycleRevision, sessionId:props.sessionId, preparedText:prepared.text, executeSlash:props.executeSlash}) : null;
-                const editing = bodyEdit && bodyEdit.sessionId === props.sessionId && settled && storyTurn > 0 && Number(bodyEdit.edit.turn) === storyTurn;
+                // Only the turn's closing node shows the reply; earlier step nodes of the same turn stay hidden.
+                const editing = bodyEdit && bodyEdit.sessionId === props.sessionId && settled && storyTurn > 0 && Number(bodyEdit.edit.turn) === storyTurn && data.finalNode && tail?.closing?.finalNode?.seq === data.finalNode.seq;
                 const body = editing ? React.createElement(InlineBodyEditor, { panel: bodyEdit }) : legacyGreeting ? React.createElement(TavernLegacyGreeting, {key:props.sessionId+":greeting", source:greetingSource, sessionId:props.sessionId, executeSlash:props.executeSlash}, rendered) : rendered;
 				return React.createElement("div", { ref:historyNode, className: "dsh-tavern-assistant", "data-streaming": data.status === "running" || undefined }, body, pendingMessage, illustration, mvuReceiptNode, inlineStatus);
 			}
