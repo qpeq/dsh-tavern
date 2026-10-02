@@ -808,6 +808,35 @@
                 React.createElement("p", { className: "dsh-local-help" }, "离开输入框后保存，仅用于后续内容。"), React.createElement("span", { role: "status", className: "dsh-local-feedback" }, status));
         }
 
+        function TavernLocalPersona(props) {
+            const h = React.createElement;
+            const [data, setData] = React.useState(null), [busy, setBusy] = React.useState(false), [status, setStatus] = React.useState("");
+            React.useEffect(() => {
+                let active = true;
+                Promise.all([rpc("getConversationPersona", { sessionId: props.sessionId }, props.sessionId), rpc("getTavernSettings")]).then(([current, settings]) => {
+                    if (active) setData({ current: current.persona, personas: settings.settings?.personas || [] });
+                }, err => { if (active) setStatus("读取失败：" + err.message); });
+                return () => { active = false; };
+            }, []);
+            async function change(personaId) {
+                setBusy(true); setStatus("保存中…");
+                try {
+                    const result = await rpc("setConversationPersona", { sessionId: props.sessionId, personaId }, props.sessionId);
+                    setData(current => ({ ...current, current: result.persona })); setStatus("已保存，玩家称呼为「" + result.playerName + "」");
+                    liveTavernView.invalidate(props.sessionId); notifyTavernDataChanged(["sessions"], "play-controls");
+                } catch (err) { setStatus("保存失败：" + err.message); }
+                finally { setBusy(false); }
+            }
+            const current = data?.current, known = current && data.personas.some(item => item.id === current.id);
+            return h("div", { className: "dsh-local-field" },
+                h("label", null, "玩家人设", h("select", { className: "dsh-tavern-settings-select", "aria-label": "本局玩家人设", value: current?.id || "", disabled: !data || busy, onChange: event => change(event.target.value) },
+                    h("option", { value: "" }, "不使用人设"),
+                    current && !known ? h("option", { value: current.id }, current.name + "（已从人设库删除）") : null,
+                    (data?.personas || []).map(item => h("option", { key: item.id, value: item.id }, item.name)))),
+                h("p", { className: "dsh-local-help" }, "人设描述注入在人物卡设定之前，并把玩家称呼改为人设名称；从下一轮生效。"),
+                h("span", { role: "status", className: "dsh-local-feedback" }, status));
+        }
+
         function TavernStatusBarSetting(props) {
             const h = React.createElement;
             const state = useLiveTavernView(props.sessionId, "status-bar-setting");
@@ -838,10 +867,11 @@
                     h("p", { className: "dsh-local-intro" }, "仅影响本局，修改后自动保存。已有对话和变量会保留。"),
                     h("section", { className: "dsh-local-section" }, h("h3", null, "基本信息"),
                         h(TavernLocalPlayerName, { key: owner + ":name", sessionId: owner }),
+                        h(TavernLocalPersona, { key: owner + ":persona", sessionId: owner }),
                         h(TavernStatusBarSetting, { key: owner + ":status", sessionId: owner }),
                         h(TavernConversationPreset, { key: owner + ":preset", sessionId: owner }),
                         h(UserPreferenceProfileTab, { key: owner + ":profile", scope: { sessionId: owner }, conversationOnly: true }),
-                        h("p", { className: "dsh-local-warning" }, "切换预设或长期偏好会使提示词缓存失效，首次请求会增加耗时和费用。")),
+                        h("p", { className: "dsh-local-warning" }, "切换预设、人设或长期偏好会使提示词缓存失效，首次请求会增加耗时和费用。")),
                     h(TavernConversationBackgroundModel, { key: owner, sessionId: owner }), h(TavernConversationWritingSkills, { key: owner + ":skills", sessionId: owner })) : h("p", null, "请选择一个游玩对话。")));
         }
 

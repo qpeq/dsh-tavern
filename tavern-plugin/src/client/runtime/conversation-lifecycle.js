@@ -163,7 +163,7 @@
                 // Preview tokens are ephemeral; retries after re-opening the picker
                 // must still find the Session belonging to the same user choice.
                 const key = JSON.stringify([request.kind, request.targetMode, request.card && request.card.path,
-                    request.openingId, request.userName, request.requestMode, request.task, request.pending]);
+                    request.openingId, request.userName, request.personaId, request.requestMode, request.task, request.pending]);
                 if (running.has(key)) return running.get(key);
                 const work = run(request, key).finally(() => running.delete(key));
                 running.set(key, work);

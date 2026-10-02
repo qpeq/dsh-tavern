@@ -82,7 +82,7 @@ export function createConversationInitialization(options) {
     return prepared === undefined ? await presets.fullSnapshot() : prepared
   }
 
-  async function initialize({ cardPath, sessionId, mode, openingId, userName, requestMode, preparation, cardTask, importDraft = false }) {
+  async function initialize({ cardPath, sessionId, mode, openingId, userName, personaId, requestMode, preparation, cardTask, importDraft = false }) {
     if (requestMode === 'sillytavern') throw new Error('silly 模式已停用')
     const currentSettings = await settings()
     const defaults = normalizePlayDefaults(currentSettings.defaultPlaySettings)
@@ -107,7 +107,11 @@ export function createConversationInitialization(options) {
         return await present(current, card)
       }
     }
-    const macroState = { userName: str(userName).trim().slice(0, 80) || defaults.playerName, local: {}, global: {} }
+    // personaId: undefined = the default persona, '' = none. A persona names {{user}}.
+    const personas = Array.isArray(currentSettings.personas) ? currentSettings.personas : []
+    const wantedPersonaId = personaId === undefined || personaId === null ? str(currentSettings.defaultPersonaId) : str(personaId)
+    const persona = groupOfMode(chatMode) === 'play' ? personas.find(item => item.id === wantedPersonaId) || null : null
+    const macroState = { userName: persona ? persona.name : str(userName).trim().slice(0, 80) || defaults.playerName, local: {}, global: {} }
     const runtimePresetSnapshot = groupOfMode(chatMode) === 'play' ? await playPresetSnapshot() : null
     let openingSourceText = chatMode === 'card' ? cardGreeting() : resolveCardOpening(card, openingId)
     const openingExtensions = chatMode === 'card' ? null : await cards.extensions(cardPath)
@@ -149,6 +153,7 @@ export function createConversationInitialization(options) {
     chat.runtimePresetSnapshot = runtimePresetSnapshot
     chat.runtimePresetPath = str(runtimePresetSnapshot && runtimePresetSnapshot.presetPath)
     chat.macroState = macroState
+    if (persona) chat.persona = { ...persona }
     // Card-bound card sessions, including the edit task, keep the card Agent persona
     // and receive the foreground card + constant-worldbook snapshot, frozen at start.
     // Sessions created by the retired edit experiment keep their cardEditContext.
@@ -348,7 +353,7 @@ export function createConversationInitialization(options) {
 
   return Object.freeze({
     start: input => serialize(input.sessionId, () => initialize(input)),
-    prepareImport: input => serialize(input.sessionId, () => initialize({ ...input, mode: 'play', requestMode: 'dsh', importDraft: true })),
+    prepareImport: input => serialize(input.sessionId, () => initialize({ personaId: '', ...input, mode: 'play', requestMode: 'dsh', importDraft: true })),
     ensureOpening: sessionId => serialize(sessionId, () => recover(sessionId))
   })
 }

@@ -1,5 +1,6 @@
 import { compactionPolicy } from './auto-compaction.js'
 import { normalizeBackgroundModel } from './background-model-selection.js'
+import { randomUUID } from 'node:crypto'
 
 function object(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {}
@@ -15,6 +16,56 @@ export function normalizeBackgroundTasks(value) {
   return { posture: tasks.posture !== false, characterDesign: false, variables: tasks.variables !== false, ledger: false }
 }
 
+const PERSONA_LIMIT = 100
+const PERSONA_DESCRIPTION_LIMIT = 20000
+
+/** A player persona: who {{user}} is. Its description is injected right before the card description. */
+export function normalizePersona(value) {
+  const input = object(value)
+  const id = typeof input.id === 'string' ? input.id.trim() : ''
+  const name = typeof input.name === 'string' ? input.name.trim().slice(0, 80) : ''
+  if (id === '' || name === '') return null
+  return { id, name, description: typeof input.description === 'string' ? input.description.trim().slice(0, PERSONA_DESCRIPTION_LIMIT) : '' }
+}
+
+export function normalizePersonas(value) {
+  const seen = new Set()
+  return (Array.isArray(value) ? value : []).map(normalizePersona).filter(persona => persona !== null && !seen.has(persona.id) && seen.add(persona.id)).slice(0, PERSONA_LIMIT)
+}
+
+export function defaultPersonaId(document) {
+  const id = object(document).defaultPersonaId
+  return typeof id === 'string' && normalizePersonas(object(document).personas).some(persona => persona.id === id) ? id : ''
+}
+
+export function findPersona(document, id) {
+  return typeof id === 'string' && id !== '' ? normalizePersonas(object(document).personas).find(persona => persona.id === id) || null : null
+}
+
+function applyPersonaPatch(next, input) {
+  let personas = normalizePersonas(next.personas)
+  if (Object.hasOwn(input, 'savePersona')) {
+    const patch = object(input.savePersona)
+    if (typeof patch.name !== 'string' || patch.name.trim() === '' || patch.name.trim().length > 80) throw new Error('人设名称不能为空，最多 80 字')
+    if (Object.hasOwn(patch, 'description') && (typeof patch.description !== 'string' || patch.description.length > PERSONA_DESCRIPTION_LIMIT)) throw new Error('人设描述最多 ' + PERSONA_DESCRIPTION_LIMIT + ' 字')
+    const id = typeof patch.id === 'string' && patch.id !== '' ? patch.id : randomUUID()
+    const persona = normalizePersona({ ...patch, id })
+    const index = personas.findIndex(item => item.id === id)
+    if (index >= 0) personas[index] = persona
+    else if (patch.id) throw new Error('人设不存在，请刷新后重试')
+    else if (personas.length >= PERSONA_LIMIT) throw new Error('人设最多 ' + PERSONA_LIMIT + ' 个')
+    else personas.push(persona)
+  }
+  if (Object.hasOwn(input, 'deletePersona')) personas = personas.filter(persona => persona.id !== input.deletePersona)
+  next.personas = personas
+  if (Object.hasOwn(input, 'defaultPersonaId')) {
+    if (input.defaultPersonaId !== '' && !personas.some(persona => persona.id === input.defaultPersonaId)) throw new Error('默认人设不存在')
+    next.defaultPersonaId = input.defaultPersonaId
+  }
+  if (!personas.some(persona => persona.id === next.defaultPersonaId)) delete next.defaultPersonaId
+  if (personas.length === 0) delete next.personas
+}
+
 export function normalizePlayDefaults(value) {
   const input = object(value)
   return { playerName: typeof input.playerName === 'string' ? input.playerName.trim().slice(0, 80) || '你' : '你',
@@ -26,6 +77,7 @@ export function normalizePlayDefaults(value) {
 export function applyTavernSettingsPatch(current, patch) {
   const next = Object.assign({}, object(current))
   const input = object(patch)
+  if (['savePersona', 'deletePersona', 'defaultPersonaId'].some(key => Object.hasOwn(input, key))) applyPersonaPatch(next, input)
   if (Object.hasOwn(input, 'defaultPlaySettings')) {
     const patch = object(input.defaultPlaySettings)
     for (const key of ['webSearchEnabled', 'sceneImagesEnabled']) if (Object.hasOwn(patch, key) && typeof patch[key] !== 'boolean') throw new Error('默认开关必须为布尔值')
@@ -117,6 +169,8 @@ export function presentTavernSettings(document, defaults) {
   const story = prompts.find(function (item) { return item.name === 'story' }) || { text: '', customized: false }
   return {
     defaultPlaySettings: normalizePlayDefaults(object(document).defaultPlaySettings),
+    personas: normalizePersonas(object(document).personas),
+    defaultPersonaId: defaultPersonaId(document),
     defaultDisabledWritingSkills: Array.isArray(object(document).defaultDisabledWritingSkills) ? object(document).defaultDisabledWritingSkills.filter(name => typeof name === 'string') : [],
     defaultForegroundModel: normalizeBackgroundModel(object(document).defaultForegroundModel),
     defaultBackgroundModel: normalizeBackgroundModel(object(document).defaultBackgroundModel),
