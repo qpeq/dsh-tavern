@@ -46,20 +46,20 @@ function applyPersonaPatch(next, input) {
   let personas = normalizePersonas(next.personas)
   if (Object.hasOwn(input, 'savePersona')) {
     const patch = object(input.savePersona)
-    if (typeof patch.name !== 'string' || patch.name.trim() === '' || patch.name.trim().length > 80) throw new Error('人设名称不能为空，最多 80 字')
-    if (Object.hasOwn(patch, 'description') && (typeof patch.description !== 'string' || patch.description.length > PERSONA_DESCRIPTION_LIMIT)) throw new Error('人设描述最多 ' + PERSONA_DESCRIPTION_LIMIT + ' 字')
+    if (typeof patch.name !== 'string' || patch.name.trim() === '' || patch.name.trim().length > 80) throw new Error('Persona name is required (max 80 characters)')
+    if (Object.hasOwn(patch, 'description') && (typeof patch.description !== 'string' || patch.description.length > PERSONA_DESCRIPTION_LIMIT)) throw new Error('Persona description is limited to ' + PERSONA_DESCRIPTION_LIMIT + ' characters')
     const id = typeof patch.id === 'string' && patch.id !== '' ? patch.id : randomUUID()
     const persona = normalizePersona({ ...patch, id })
     const index = personas.findIndex(item => item.id === id)
     if (index >= 0) personas[index] = persona
-    else if (patch.id) throw new Error('人设不存在，请刷新后重试')
-    else if (personas.length >= PERSONA_LIMIT) throw new Error('人设最多 ' + PERSONA_LIMIT + ' 个')
+    else if (patch.id) throw new Error('Persona not found; refresh and try again')
+    else if (personas.length >= PERSONA_LIMIT) throw new Error('At most ' + PERSONA_LIMIT + ' personas')
     else personas.push(persona)
   }
   if (Object.hasOwn(input, 'deletePersona')) personas = personas.filter(persona => persona.id !== input.deletePersona)
   next.personas = personas
   if (Object.hasOwn(input, 'defaultPersonaId')) {
-    if (input.defaultPersonaId !== '' && !personas.some(persona => persona.id === input.defaultPersonaId)) throw new Error('默认人设不存在')
+    if (input.defaultPersonaId !== '' && !personas.some(persona => persona.id === input.defaultPersonaId)) throw new Error('Default persona not found')
     next.defaultPersonaId = input.defaultPersonaId
   }
   if (!personas.some(persona => persona.id === next.defaultPersonaId)) delete next.defaultPersonaId

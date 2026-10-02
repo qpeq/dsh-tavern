@@ -184,10 +184,10 @@ export function createPlayCardSnapshots({ worldBooks, planner, readCard, writeCh
   // Rebuilds the frozen prefix from the game's own card definition and
   // worldbook snapshot, so switching persona never adopts unconfirmed card edits.
   async function personaReplacement(chat, persona) {
-    if (!usesFixedContext(chat) || chat.mode === 'card') throw new Error('仅支持游玩会话')
-    if (!str(chat.cardContextSnapshot)) throw new Error('当前游戏缺少人物卡快照，请先恢复会话后重试')
+    if (!usesFixedContext(chat) || chat.mode === 'card') throw new Error('Personas only apply to play sessions')
+    if (!str(chat.cardContextSnapshot)) throw new Error('This game has no card snapshot yet; reopen the session and try again')
     const card = chat.cardDefinitionSnapshot || await readCard(chat)
-    if (!card) throw new Error('人物卡不存在')
+    if (!card) throw new Error('Character card not found')
     const macroState = { ...(chat.macroState || {}), userName: persona ? persona.name : str(chat.macroState?.userName) || '你' }
     const patch = await build({ ...chat, persona, macroState }, card, true)
     return { ...patch, persona, macroState, cardContextRevision: (Number(chat.cardContextRevision) || 0) + 1 }

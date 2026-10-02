@@ -3699,20 +3699,20 @@ export async function apply(ctx) {
       case 'setPlayerName': return { playerName: await setPlayerName(args && args.sessionId, args && args.userName) }
       case 'getConversationPersona': {
         const chat = await chatForSession(str(args?.sessionId))
-        if (!chat || groupOfMode(chat.mode) !== 'play') throw new Error('请先打开游玩会话')
+        if (!chat || groupOfMode(chat.mode) !== 'play') throw new Error('Open a play session first')
         return { persona: chat.persona || null, playerName: str(chat.macroState?.userName).trim() || '你' }
       }
       case 'setConversationPersona': {
         const sessionId = str(args?.sessionId)
         const chat = await chatForSession(sessionId)
-        if (!chat || groupOfMode(chat.mode) !== 'play') throw new Error('请先打开游玩会话')
+        if (!chat || groupOfMode(chat.mode) !== 'play') throw new Error('Open a play session first')
         const personaId = str(args?.personaId)
         const persona = personaId === '' ? null : findPersona(tavernSettingsDocument, personaId)
-        if (personaId !== '' && !persona) throw new Error('人设不存在，请刷新后重试')
-        if ((await sessionActivity(sessionId))?.busy || agentRegistry.get(sessionId)?.phase?.kind === 'running') throw new Error('请等待当前生成和后台任务完成后再切换人设')
+        if (personaId !== '' && !persona) throw new Error('Persona not found; refresh and try again')
+        if ((await sessionActivity(sessionId))?.busy || agentRegistry.get(sessionId)?.phase?.kind === 'running') throw new Error('Wait for the current generation and background tasks to finish before switching persona')
         const patch = await playCardSnapshots.personaReplacement(chat, persona)
         const saved = await updateChat(chat.id, current => {
-          if (current._storageRevision !== chat._storageRevision || Number(current.cardContextRevision || 0) !== Number(chat.cardContextRevision || 0) || current.cardContextSnapshot !== chat.cardContextSnapshot) throw new Error('当前游戏配置已变化，请刷新后重试')
+          if (current._storageRevision !== chat._storageRevision || Number(current.cardContextRevision || 0) !== Number(chat.cardContextRevision || 0) || current.cardContextSnapshot !== chat.cardContextSnapshot) throw new Error('The game changed meanwhile; refresh and try again')
           return Object.assign(current, patch)
         }, { source: 'persona.set' })
         return { persona: saved.persona || null, playerName: str(saved.macroState?.userName).trim() || '你' }

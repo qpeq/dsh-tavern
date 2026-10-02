@@ -11396,8 +11396,8 @@ function subscribeTavernHostTheme(win, listener) {
 				h("div", { className: "dsh-tavern-card-picker-head" }, h("button", { className: "dsh-tavern-btn", disabled: busy, onClick: discardOpening }, "放弃开局"), h("span", null, openingPicker.card.name + " · 游戏准备"), h("button", { className: "dsh-tavern-btn", "aria-expanded": !openingSettingsCollapsed, onClick: function () { openingSettingsManual.current = true; setOpeningSettingsCollapsed(function (value) { return !value; }); } }, openingSettingsCollapsed ? "展开设置" : "折叠设置"), h("span", { className: "dsh-tavern-spacer" }), h("button", { className: "dsh-tavern-btn", disabled: busy, onClick: closePicker }, "暂时收起")),
 				busy ? h("div", { className: "dsh-tavern-session-switching", role: "status", "aria-live": "polite" }, openingPicker.preparing ? "正在准备开场与脚本资源…" : "正在完成游戏初始化…", openingPicker.preparing ? h("div", { style: { marginTop: "8px", fontSize: "13px", opacity: .75 } }, "首次打开可能需要下载资源，请稍候；后续打开通常更快。") : null) : null,
 					selectedOpening ? h("div", { hidden: openingSettingsCollapsed },
-						(openingPicker.personas || []).length ? h("label", { className: "dsh-tavern-player-name" }, h("span", null, "玩家人设"), h("select", { value: openingPicker.personaId || "", disabled: busy, onChange: function (event) { const personaId = event.target.value; setOpeningPicker(function (current) { const persona = current && (current.personas || []).find(function (item) { return item.id === personaId; }); return current ? Object.assign({}, current, { personaId: personaId }, persona ? { userName: persona.name } : {}) : current; }); } }, h("option", { value: "" }, "不使用人设"), openingPicker.personas.map(function (item) { return h("option", { key: item.id, value: item.id }, item.name); }))) : null,
-						h("label", { className: "dsh-tavern-player-name" }, h("span", null, "故事中的玩家称呼（可选）"), h("input", { value: openingPicker.userName ?? "", maxLength: 80, placeholder: "你", disabled: busy || Boolean(openingPicker.personaId), title: openingPicker.personaId ? "使用人设时，玩家称呼即人设名称" : undefined, onChange: function (event) { const userName = event.target.value; setOpeningPicker(function (current) { return current ? Object.assign({}, current, { userName: userName }) : current; }); } })),
+						(openingPicker.personas || []).length ? h("label", { className: "dsh-tavern-player-name" }, h("span", null, "Player persona"), h("select", { value: openingPicker.personaId || "", disabled: busy, onChange: function (event) { const personaId = event.target.value; setOpeningPicker(function (current) { const persona = current && (current.personas || []).find(function (item) { return item.id === personaId; }); return current ? Object.assign({}, current, { personaId: personaId }, persona ? { userName: persona.name } : {}) : current; }); } }, h("option", { value: "" }, "No persona"), openingPicker.personas.map(function (item) { return h("option", { key: item.id, value: item.id }, item.name); }))) : null,
+						h("label", { className: "dsh-tavern-player-name" }, h("span", null, "故事中的玩家称呼（可选）"), h("input", { value: openingPicker.userName ?? "", maxLength: 80, placeholder: "你", disabled: busy || Boolean(openingPicker.personaId), title: openingPicker.personaId ? "With a persona selected, the player name is the persona name" : undefined, onChange: function (event) { const userName = event.target.value; setOpeningPicker(function (current) { return current ? Object.assign({}, current, { userName: userName }) : current; }); } })),
 						h("div", { className: "dsh-tavern-player-name-help" }, "可以填写姓名、昵称或身份；默认沿用你上次使用的称呼，也可以在这里针对本局修改。开场白预览会随之更新。")
 					) : null,
 				openingPicker.openings.length > 1 ? h("div", { className: "dsh-tavern-greeting-nav" },
@@ -12139,25 +12139,25 @@ function subscribeTavernHostTheme(win, listener) {
                     try {
                         const result = await rpc("updateTavernSettings", { patch });
                         setPersonas(result.settings.personas || []); setDefaultId(result.settings.defaultPersonaId || "");
-                        notifySettingsChanged(); if (done) done(); setMessage("已保存");
-                    } catch (err) { setMessage("保存失败：" + err.message); }
+                        notifySettingsChanged(); if (done) done(); setMessage("Saved");
+                    } catch (err) { setMessage("Save failed: " + err.message); }
                     finally { setBusy(false); }
                 }
                 const editor = editing ? h("div", { className: "dsh-tavern-persona-editor" },
-                    h("label", { className: "dsh-local-field" }, "名称（即 {{user}}）", h("input", { value: editing.name, maxLength: 80, disabled: busy, onChange: event => setEditing({ ...editing, name: event.target.value }) })),
-                    h("label", { className: "dsh-local-field" }, "人设描述", h("textarea", { value: editing.description, rows: 6, maxLength: 20000, disabled: busy, onChange: event => setEditing({ ...editing, description: event.target.value }) })),
+                    h("label", { className: "dsh-local-field" }, "Name (used as {{user}})", h("input", { value: editing.name, maxLength: 80, disabled: busy, onChange: event => setEditing({ ...editing, name: event.target.value }) })),
+                    h("label", { className: "dsh-local-field" }, "Description", h("textarea", { value: editing.description, rows: 6, maxLength: 20000, disabled: busy, onChange: event => setEditing({ ...editing, description: event.target.value }) })),
                     h("div", { className: "dsh-tavern-persona-actions" },
-                        h("button", { type: "button", disabled: busy || !editing.name.trim(), onClick: () => save({ savePersona: editing }, () => setEditing(null)) }, "保存"),
-                        h("button", { type: "button", disabled: busy, onClick: () => setEditing(null) }, "取消"))) : null;
+                        h("button", { type: "button", disabled: busy || !editing.name.trim(), onClick: () => save({ savePersona: editing }, () => setEditing(null)) }, "Save"),
+                        h("button", { type: "button", disabled: busy, onClick: () => setEditing(null) }, "Cancel"))) : null;
                 return h("div", { className: "dsh-tavern-settings-section dsh-local-settings dsh-tavern-persona-settings" },
                     h("section", { className: "dsh-local-section" },
-                        h("label", { className: "dsh-local-field" }, "新游戏默认人设", h("select", { disabled: busy, value: defaultId, onChange: event => save({ defaultPersonaId: event.target.value }) },
-                            h("option", { value: "" }, "不使用人设"), personas.map(item => h("option", { key: item.id, value: item.id }, item.name)))),
+                        h("label", { className: "dsh-local-field" }, "Default persona for new games", h("select", { disabled: busy, value: defaultId, onChange: event => save({ defaultPersonaId: event.target.value }) },
+                            h("option", { value: "" }, "No persona"), personas.map(item => h("option", { key: item.id, value: item.id }, item.name)))),
                         h("ul", { className: "dsh-tavern-persona-list" }, personas.map(item => h("li", { key: item.id },
-                            h("span", { className: "dsh-tavern-settings-copy" }, h("strong", null, item.name), h("span", { className: "dsh-tavern-settings-desc" }, item.description ? item.description.slice(0, 120) + (item.description.length > 120 ? "…" : "") : "（无描述）")),
-                            h("button", { type: "button", disabled: busy || !!editing, onClick: () => setEditing({ id: item.id, name: item.name, description: item.description }) }, "编辑"),
-                            h("button", { type: "button", disabled: busy || !!editing, onClick: () => { if (window.confirm("删除人设「" + item.name + "」？已开始的游戏不受影响。")) save({ deletePersona: item.id }); } }, "删除")))),
-                        editor || h("button", { type: "button", disabled: busy, onClick: () => setEditing({ name: "", description: "" }) }, "新建人设")),
+                            h("span", { className: "dsh-tavern-settings-copy" }, h("strong", null, item.name), h("span", { className: "dsh-tavern-settings-desc" }, item.description ? item.description.slice(0, 120) + (item.description.length > 120 ? "…" : "") : "(no description)")),
+                            h("button", { type: "button", disabled: busy || !!editing, onClick: () => setEditing({ id: item.id, name: item.name, description: item.description }) }, "Edit"),
+                            h("button", { type: "button", disabled: busy || !!editing, onClick: () => { if (window.confirm("Delete persona \"" + item.name + "\"? Games already started keep it.")) save({ deletePersona: item.id }); } }, "Delete")))),
+                        editor || h("button", { type: "button", disabled: busy, onClick: () => setEditing({ name: "", description: "" }) }, "New persona")),
                     message ? h("p", { role: "status" }, message) : null);
             }
 
@@ -12194,7 +12194,7 @@ function subscribeTavernHostTheme(win, listener) {
                     React.createElement(TavernDefaultModelSetting, { label: "默认后台模型", title: "后台模型", fallback: "跟随前台", selection: state.defaultBackgroundModel, catalog: state.modelCatalog, disabled: state.loading || state.busy, onChange: selection => saveDefault("defaultBackgroundModel", selection) }),
                     React.createElement(TavernDefaultModelSetting, { label: "卡片工作台默认模型", title: "工作台模型", fallback: "跟随前台", selection: state.defaultWorkbenchModel, catalog: state.modelCatalog, disabled: state.loading || state.busy, onChange: selection => saveDefault("defaultWorkbenchModel", selection) })),
                     state.notice ? h("p", { className: "dsh-tavern-gs-notice", role: "status" }, state.notice) : null),
-                    group("玩家人设", "人设名称作为 {{user}}，描述注入在人物卡设定之前。开局时可选择，开局后可在本局设置中切换。",
+                    group("Player personas", "The persona name is used as {{user}}; its description is injected right before the character description. Pick one when starting a game, or switch later in the game's own settings.",
                         state.settings ? h(PersonaSettings, { settings: state.settings }) : null),
                     group("新游戏默认", "开局时继承，开局后可在本局设置中单独修改。",
                         state.settings ? h(GlobalPlayDefaults, { settings: state.settings }) : null,
@@ -15413,25 +15413,25 @@ function subscribeTavernHostTheme(win, listener) {
                 let active = true;
                 Promise.all([rpc("getConversationPersona", { sessionId: props.sessionId }, props.sessionId), rpc("getTavernSettings")]).then(([current, settings]) => {
                     if (active) setData({ current: current.persona, personas: settings.settings?.personas || [] });
-                }, err => { if (active) setStatus("读取失败：" + err.message); });
+                }, err => { if (active) setStatus("Failed to load: " + err.message); });
                 return () => { active = false; };
             }, []);
             async function change(personaId) {
-                setBusy(true); setStatus("保存中…");
+                setBusy(true); setStatus("Saving…");
                 try {
                     const result = await rpc("setConversationPersona", { sessionId: props.sessionId, personaId }, props.sessionId);
-                    setData(current => ({ ...current, current: result.persona })); setStatus("已保存，玩家称呼为「" + result.playerName + "」");
+                    setData(current => ({ ...current, current: result.persona })); setStatus("Saved. Player name is now \"" + result.playerName + "\".");
                     liveTavernView.invalidate(props.sessionId); notifyTavernDataChanged(["sessions"], "play-controls");
-                } catch (err) { setStatus("保存失败：" + err.message); }
+                } catch (err) { setStatus("Save failed: " + err.message); }
                 finally { setBusy(false); }
             }
             const current = data?.current, known = current && data.personas.some(item => item.id === current.id);
             return h("div", { className: "dsh-local-field" },
-                h("label", null, "玩家人设", h("select", { className: "dsh-tavern-settings-select", "aria-label": "本局玩家人设", value: current?.id || "", disabled: !data || busy, onChange: event => change(event.target.value) },
-                    h("option", { value: "" }, "不使用人设"),
-                    current && !known ? h("option", { value: current.id }, current.name + "（已从人设库删除）") : null,
+                h("label", null, "Player persona", h("select", { className: "dsh-tavern-settings-select", "aria-label": "Player persona for this game", value: current?.id || "", disabled: !data || busy, onChange: event => change(event.target.value) },
+                    h("option", { value: "" }, "No persona"),
+                    current && !known ? h("option", { value: current.id }, current.name + " (deleted from the library)") : null,
                     (data?.personas || []).map(item => h("option", { key: item.id, value: item.id }, item.name)))),
-                h("p", { className: "dsh-local-help" }, "人设描述注入在人物卡设定之前，并把玩家称呼改为人设名称；从下一轮生效。"),
+                h("p", { className: "dsh-local-help" }, "Injected right before the character description; the persona name becomes the player name. Applies from the next turn."),
                 h("span", { role: "status", className: "dsh-local-feedback" }, status));
         }
 
@@ -15469,7 +15469,7 @@ function subscribeTavernHostTheme(win, listener) {
                         h(TavernStatusBarSetting, { key: owner + ":status", sessionId: owner }),
                         h(TavernConversationPreset, { key: owner + ":preset", sessionId: owner }),
                         h(UserPreferenceProfileTab, { key: owner + ":profile", scope: { sessionId: owner }, conversationOnly: true }),
-                        h("p", { className: "dsh-local-warning" }, "切换预设、人设或长期偏好会使提示词缓存失效，首次请求会增加耗时和费用。")),
+                        h("p", { className: "dsh-local-warning" }, "切换预设或长期偏好会使提示词缓存失效，首次请求会增加耗时和费用。")),
                     h(TavernConversationBackgroundModel, { key: owner, sessionId: owner }), h(TavernConversationWritingSkills, { key: owner + ":skills", sessionId: owner })) : h("p", null, "请选择一个游玩对话。")));
         }
 

@@ -52,25 +52,25 @@ function createGlobalSettingsModule({ React, rpc, notifySettingsChanged, TavernD
             try {
                 const result = await rpc("updateTavernSettings", { patch });
                 setPersonas(result.settings.personas || []); setDefaultId(result.settings.defaultPersonaId || "");
-                notifySettingsChanged(); if (done) done(); setMessage("已保存");
-            } catch (err) { setMessage("保存失败：" + err.message); }
+                notifySettingsChanged(); if (done) done(); setMessage("Saved");
+            } catch (err) { setMessage("Save failed: " + err.message); }
             finally { setBusy(false); }
         }
         const editor = editing ? h("div", { className: "dsh-tavern-persona-editor" },
-            h("label", { className: "dsh-local-field" }, "名称（即 {{user}}）", h("input", { value: editing.name, maxLength: 80, disabled: busy, onChange: event => setEditing({ ...editing, name: event.target.value }) })),
-            h("label", { className: "dsh-local-field" }, "人设描述", h("textarea", { value: editing.description, rows: 6, maxLength: 20000, disabled: busy, onChange: event => setEditing({ ...editing, description: event.target.value }) })),
+            h("label", { className: "dsh-local-field" }, "Name (used as {{user}})", h("input", { value: editing.name, maxLength: 80, disabled: busy, onChange: event => setEditing({ ...editing, name: event.target.value }) })),
+            h("label", { className: "dsh-local-field" }, "Description", h("textarea", { value: editing.description, rows: 6, maxLength: 20000, disabled: busy, onChange: event => setEditing({ ...editing, description: event.target.value }) })),
             h("div", { className: "dsh-tavern-persona-actions" },
-                h("button", { type: "button", disabled: busy || !editing.name.trim(), onClick: () => save({ savePersona: editing }, () => setEditing(null)) }, "保存"),
-                h("button", { type: "button", disabled: busy, onClick: () => setEditing(null) }, "取消"))) : null;
+                h("button", { type: "button", disabled: busy || !editing.name.trim(), onClick: () => save({ savePersona: editing }, () => setEditing(null)) }, "Save"),
+                h("button", { type: "button", disabled: busy, onClick: () => setEditing(null) }, "Cancel"))) : null;
         return h("div", { className: "dsh-tavern-settings-section dsh-local-settings dsh-tavern-persona-settings" },
             h("section", { className: "dsh-local-section" },
-                h("label", { className: "dsh-local-field" }, "新游戏默认人设", h("select", { disabled: busy, value: defaultId, onChange: event => save({ defaultPersonaId: event.target.value }) },
-                    h("option", { value: "" }, "不使用人设"), personas.map(item => h("option", { key: item.id, value: item.id }, item.name)))),
+                h("label", { className: "dsh-local-field" }, "Default persona for new games", h("select", { disabled: busy, value: defaultId, onChange: event => save({ defaultPersonaId: event.target.value }) },
+                    h("option", { value: "" }, "No persona"), personas.map(item => h("option", { key: item.id, value: item.id }, item.name)))),
                 h("ul", { className: "dsh-tavern-persona-list" }, personas.map(item => h("li", { key: item.id },
-                    h("span", { className: "dsh-tavern-settings-copy" }, h("strong", null, item.name), h("span", { className: "dsh-tavern-settings-desc" }, item.description ? item.description.slice(0, 120) + (item.description.length > 120 ? "…" : "") : "（无描述）")),
-                    h("button", { type: "button", disabled: busy || !!editing, onClick: () => setEditing({ id: item.id, name: item.name, description: item.description }) }, "编辑"),
-                    h("button", { type: "button", disabled: busy || !!editing, onClick: () => { if (window.confirm("删除人设「" + item.name + "」？已开始的游戏不受影响。")) save({ deletePersona: item.id }); } }, "删除")))),
-                editor || h("button", { type: "button", disabled: busy, onClick: () => setEditing({ name: "", description: "" }) }, "新建人设")),
+                    h("span", { className: "dsh-tavern-settings-copy" }, h("strong", null, item.name), h("span", { className: "dsh-tavern-settings-desc" }, item.description ? item.description.slice(0, 120) + (item.description.length > 120 ? "…" : "") : "(no description)")),
+                    h("button", { type: "button", disabled: busy || !!editing, onClick: () => setEditing({ id: item.id, name: item.name, description: item.description }) }, "Edit"),
+                    h("button", { type: "button", disabled: busy || !!editing, onClick: () => { if (window.confirm("Delete persona \"" + item.name + "\"? Games already started keep it.")) save({ deletePersona: item.id }); } }, "Delete")))),
+                editor || h("button", { type: "button", disabled: busy, onClick: () => setEditing({ name: "", description: "" }) }, "New persona")),
             message ? h("p", { role: "status" }, message) : null);
     }
 
@@ -107,7 +107,7 @@ function createGlobalSettingsModule({ React, rpc, notifySettingsChanged, TavernD
             React.createElement(TavernDefaultModelSetting, { label: "默认后台模型", title: "后台模型", fallback: "跟随前台", selection: state.defaultBackgroundModel, catalog: state.modelCatalog, disabled: state.loading || state.busy, onChange: selection => saveDefault("defaultBackgroundModel", selection) }),
             React.createElement(TavernDefaultModelSetting, { label: "卡片工作台默认模型", title: "工作台模型", fallback: "跟随前台", selection: state.defaultWorkbenchModel, catalog: state.modelCatalog, disabled: state.loading || state.busy, onChange: selection => saveDefault("defaultWorkbenchModel", selection) })),
             state.notice ? h("p", { className: "dsh-tavern-gs-notice", role: "status" }, state.notice) : null),
-            group("玩家人设", "人设名称作为 {{user}}，描述注入在人物卡设定之前。开局时可选择，开局后可在本局设置中切换。",
+            group("Player personas", "The persona name is used as {{user}}; its description is injected right before the character description. Pick one when starting a game, or switch later in the game's own settings.",
                 state.settings ? h(PersonaSettings, { settings: state.settings }) : null),
             group("新游戏默认", "开局时继承，开局后可在本局设置中单独修改。",
                 state.settings ? h(GlobalPlayDefaults, { settings: state.settings }) : null,

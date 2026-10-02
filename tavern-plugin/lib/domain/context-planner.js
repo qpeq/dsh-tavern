@@ -43,7 +43,7 @@ export function createContextPlanner(options = {}) {
     if (input.includeDetails === true) {
       // The player persona sits right before the character description.
       const persona = input.chat && input.chat.persona
-      if (input.includeDescription !== false && persona && str(persona.description).trim() !== '') cardInfoSections.push({ kind: 'persona', required: false, text: projectText('玩家人设（{{user}}）: ' + str(persona.description).trim()) })
+      if (input.includeDescription !== false && persona && str(persona.description).trim() !== '') cardInfoSections.push({ kind: 'persona', required: false, text: projectText('Player persona ({{user}}): ' + str(persona.description).trim()) })
       if (input.includeDescription !== false) cardInfoSections.push({ kind: 'card', required: false, text: '设定: ' + projectText([str(input.card.description), '{{user}} 表示玩家。'].filter(Boolean).join('\n')) })
       if (input.includePersonality !== false && str(input.card.personality) !== '') cardInfoSections.push({ kind: 'card', required: false, text: '主要人物性格: ' + projectText(input.card.personality) })
       if (input.includeScenario !== false && str(input.card.scenario) !== '') cardInfoSections.push({ kind: 'card', required: false, text: '开场情境: ' + projectText(input.card.scenario) })
