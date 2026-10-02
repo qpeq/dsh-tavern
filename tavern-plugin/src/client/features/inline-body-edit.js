@@ -18,11 +18,17 @@
 		function InlineBodyTextarea({ value, disabled, label, onChange, onKeyDown, autoFocus }) {
 			const ref = React.useRef(null);
 			// Grow with the text, so editing looks like the reply itself rather than a scroll box.
+			// Re-measuring briefly collapses the box, which shrinks the chat and clamps its scroll position
+			// (the view jumped on the first keystroke); keep the scroller's offset across the measurement.
 			React.useLayoutEffect(() => {
 				const area = ref.current;
 				if (!area) return;
+				let scroller = area.parentElement;
+				while (scroller && !/auto|scroll/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+				const offset = scroller ? scroller.scrollTop : 0;
 				area.style.height = "auto";
 				area.style.height = area.scrollHeight + 2 + "px";
+				if (scroller && scroller.scrollTop !== offset) scroller.scrollTop = offset;
 			}, [value]);
 			React.useEffect(() => { if (autoFocus && ref.current && ref.current.offsetParent !== null) { ref.current.focus({ preventScroll: true }); ref.current.setSelectionRange(0, 0); } }, []);
 			return React.createElement("textarea", { ref, value, disabled, "aria-label": label, rows: 3, onChange, onKeyDown,
