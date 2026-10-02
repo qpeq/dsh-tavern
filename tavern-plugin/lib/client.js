@@ -12145,7 +12145,7 @@ function subscribeTavernHostTheme(win, listener) {
                 }
                 const editor = editing ? h("div", { className: "dsh-tavern-persona-editor" },
                     h("label", { className: "dsh-local-field" }, "Name (used as {{user}})", h("input", { value: editing.name, maxLength: 80, disabled: busy, onChange: event => setEditing({ ...editing, name: event.target.value }) })),
-                    h("label", { className: "dsh-local-field" }, "Description", h("textarea", { value: editing.description, rows: 6, maxLength: 20000, disabled: busy, onChange: event => setEditing({ ...editing, description: event.target.value }) })),
+                    h("label", { className: "dsh-local-field", style: { display: "flex", flexDirection: "column", alignItems: "stretch", gap: "8px" } }, "Description", h("textarea", { value: editing.description, rows: 18, maxLength: 20000, disabled: busy, style: { width: "100%", minHeight: "360px", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", fontSize: "14px", lineHeight: 1.5, padding: "10px" }, onChange: event => setEditing({ ...editing, description: event.target.value }) })),
                     h("div", { className: "dsh-tavern-persona-actions" },
                         h("button", { type: "button", disabled: busy || !editing.name.trim(), onClick: () => save({ savePersona: editing }, () => setEditing(null)) }, "Save"),
                         h("button", { type: "button", disabled: busy, onClick: () => setEditing(null) }, "Cancel"))) : null;
