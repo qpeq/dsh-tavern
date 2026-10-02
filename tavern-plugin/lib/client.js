@@ -10534,6 +10534,146 @@ function subscribeTavernHostTheme(win, listener) {
 			return Array.from(groups.values());
 		}
 
+		// Player personas (name = {{user}}, description injected before the card description) and their portraits.
+		const PERSONAS_CHANGED = "dsh-tavern-personas-changed";
+		function notifyPersonasChanged() { window.dispatchEvent(new Event(PERSONAS_CHANGED)); }
+
+		// Same-named personas are told apart by the first description line they don't share.
+		function personaLabel(persona, personas) {
+			const twins = (personas || []).filter(item => item.name === persona.name);
+			if (twins.length < 2) return persona.name;
+			const lines = text => String(text || "").split("\n").map(line => line.replace(/^[\s#>*\-]+/, "").replace(/\*\*/g, "").trim()).filter(Boolean);
+			const others = new Set(twins.filter(item => item.id !== persona.id).flatMap(item => lines(item.description)));
+			const own = lines(persona.description).find(line => !others.has(line)) || lines(persona.description)[0] || "";
+			return own ? persona.name + " — " + (own.length > 32 ? own.slice(0, 32) + "…" : own) : persona.name;
+		}
+
+		function resizePortraitFile(file, maxSize = 512) {
+			return new Promise((resolve, reject) => {
+				const url = URL.createObjectURL(file), image = new Image();
+				image.onload = () => {
+					URL.revokeObjectURL(url);
+					const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+					const canvas = document.createElement("canvas");
+					canvas.width = Math.max(1, Math.round(image.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+					canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+					const webp = canvas.toDataURL("image/webp", 0.88);
+					resolve(webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/jpeg", 0.88));
+				};
+				image.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not read that image")); };
+				image.src = url;
+			});
+		}
+
+		function usePersonaLibrary() {
+			const [state, setState] = React.useState({ loaded: false, personas: [], defaultId: "", portraits: {}, error: "" });
+			const load = React.useCallback(async () => {
+				try {
+					const [settings, portraits] = await Promise.all([rpc("getTavernSettings"), rpc("getPersonaPortraits")]);
+					setState({ loaded: true, personas: settings.settings?.personas || [], defaultId: settings.settings?.defaultPersonaId || "", portraits: portraits.portraits || {}, error: "" });
+				} catch (err) { setState(current => ({ ...current, loaded: true, error: String(err.message || err) })); }
+			}, []);
+			React.useEffect(() => { load(); window.addEventListener(PERSONAS_CHANGED, load); return () => window.removeEventListener(PERSONAS_CHANGED, load); }, [load]);
+			return { ...state, reload: load };
+		}
+
+		function PersonaPortrait({ src, name, size = 48 }) {
+			const style = { width: size + "px", height: size + "px", borderRadius: "8px", flex: "0 0 auto", objectFit: "cover", objectPosition: "top" };
+			if (src) return React.createElement("img", { src, alt: name ? name + " portrait" : "Portrait", style });
+			return React.createElement("div", { "aria-hidden": true, style: { ...style, display: "grid", placeItems: "center", background: "var(--dsh-tavern-accent-soft, rgba(127,127,127,.18))", fontSize: Math.round(size * 0.42) + "px", fontWeight: 600, opacity: .8 } }, String(name || "?").slice(0, 1));
+		}
+
+		function PersonaEditor({ library, initial, onDone }) {
+			const h = React.createElement;
+			const [draft, setDraft] = React.useState(initial), [portrait, setPortrait] = React.useState(initial.id ? library.portraits[initial.id] || null : null);
+			const [busy, setBusy] = React.useState(false), [error, setError] = React.useState("");
+			const fileRef = React.useRef(null);
+			async function pick(event) {
+				const file = event.target.files && event.target.files[0]; event.target.value = "";
+				if (!file) return;
+				try { setPortrait(await resizePortraitFile(file)); } catch (err) { setError(String(err.message || err)); }
+			}
+			async function save() {
+				setBusy(true); setError("");
+				try {
+					const before = new Set(library.personas.map(item => item.id));
+					const result = await rpc("updateTavernSettings", { patch: { savePersona: { ...(draft.id ? { id: draft.id } : {}), name: draft.name, description: draft.description } } });
+					const id = draft.id || (result.settings.personas || []).map(item => item.id).find(item => !before.has(item));
+					const previous = draft.id ? library.portraits[draft.id] || null : null;
+					if (id && portrait !== previous) await rpc("setPersonaPortrait", { personaId: id, dataUrl: portrait });
+					notifyPersonasChanged(); onDone();
+				} catch (err) { setError(String(err.message || err)); }
+				finally { setBusy(false); }
+			}
+			return h("div", { className: "dsh-tavern-persona-editor", style: { display: "grid", gap: "10px", marginTop: "8px" } },
+				h("div", { style: { display: "flex", gap: "12px", alignItems: "center" } },
+					h(PersonaPortrait, { src: portrait, name: draft.name, size: 96 }),
+					h("div", { style: { display: "grid", gap: "6px" } },
+						h("input", { ref: fileRef, type: "file", accept: "image/*", hidden: true, onChange: pick }),
+						h("button", { type: "button", className: "dsh-tavern-btn", disabled: busy, onClick: () => fileRef.current && fileRef.current.click() }, portrait ? "Replace portrait" : "Upload portrait"),
+						portrait ? h("button", { type: "button", className: "dsh-tavern-btn quiet", disabled: busy, onClick: () => setPortrait(null) }, "Remove portrait") : null)),
+				h("label", { style: { display: "grid", gap: "6px" } }, "Name (used as {{user}})", h("input", { value: draft.name, maxLength: 80, disabled: busy, style: { width: "100%", boxSizing: "border-box" }, onChange: event => setDraft({ ...draft, name: event.target.value }) })),
+				h("label", { style: { display: "grid", gap: "6px" } }, "Description", h("textarea", { value: draft.description, rows: 16, maxLength: 20000, disabled: busy, style: { width: "100%", minHeight: "320px", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", fontSize: "14px", lineHeight: 1.5, padding: "10px" }, onChange: event => setDraft({ ...draft, description: event.target.value }) })),
+				h("div", { style: { display: "flex", gap: "8px" } },
+					h("button", { type: "button", className: "dsh-tavern-btn", disabled: busy || !draft.name.trim(), onClick: save }, busy ? "Saving…" : "Save"),
+					h("button", { type: "button", className: "dsh-tavern-btn quiet", disabled: busy, onClick: onDone }, "Cancel")),
+				error ? h("p", { role: "alert", className: "dsh-card-error" }, "Save failed: " + error) : null);
+		}
+
+		// Lives in the 酒馆状态 panel: this game's persona, then the persona library.
+		function TavernPersonaPanel({ sessionId }) {
+			const h = React.createElement;
+			const library = usePersonaLibrary();
+			const [current, setCurrent] = React.useState(undefined), [editing, setEditing] = React.useState(null);
+			const [busy, setBusy] = React.useState(false), [status, setStatus] = React.useState("");
+			React.useEffect(() => {
+				let active = true;
+				rpc("getConversationPersona", { sessionId }, sessionId).then(result => { if (active) setCurrent(result.persona || null); }, err => { if (active) { setCurrent(null); setStatus("Failed to load: " + err.message); } });
+				return () => { active = false; };
+			}, [sessionId]);
+			async function choose(personaId) {
+				setBusy(true); setStatus("Saving…");
+				try {
+					const result = await rpc("setConversationPersona", { sessionId, personaId }, sessionId);
+					setCurrent(result.persona || null); setStatus("Saved. Player name is now \"" + result.playerName + "\". Applies from the next turn.");
+					liveTavernView.invalidate(sessionId); notifyTavernDataChanged(["sessions"], "personas");
+				} catch (err) { setStatus("Save failed: " + err.message); }
+				finally { setBusy(false); }
+			}
+			async function update(patch, confirmText) {
+				if (confirmText && !window.confirm(confirmText)) return;
+				setBusy(true); setStatus("");
+				try { await rpc("updateTavernSettings", { patch }); notifyPersonasChanged(); }
+				catch (err) { setStatus("Save failed: " + err.message); }
+				finally { setBusy(false); }
+			}
+			const personas = library.personas, known = current && personas.some(item => item.id === current.id);
+			const section = (title, ...children) => h("section", { className: "dsh-tavern-status-section", style: { display: "grid", gap: "8px" } }, h("strong", null, title), ...children);
+			return h("div", { className: "dsh-tavern-persona-panel", style: { display: "grid", gap: "12px", marginTop: "10px" } },
+				section("This game",
+					h("div", { style: { display: "flex", gap: "10px", alignItems: "center" } },
+						h(PersonaPortrait, { src: current && library.portraits[current.id], name: current ? current.name : "", size: 56 }),
+						h("select", { className: "dsh-tavern-settings-select", "aria-label": "Player persona for this game", value: current ? current.id : "", disabled: current === undefined || busy || !library.loaded, style: { flex: 1, minWidth: 0 }, onChange: event => choose(event.target.value) },
+							h("option", { value: "" }, "No persona"),
+							current && !known ? h("option", { value: current.id }, current.name + " (deleted from the library)") : null,
+							personas.map(item => h("option", { key: item.id, value: item.id }, personaLabel(item, personas))))),
+					h("p", { className: "dsh-tavern-settings-desc", style: { margin: 0 } }, "The description is injected right before the character description; the persona name becomes the player name. Switching resets the prompt cache once."),
+					status ? h("p", { role: "status", style: { margin: 0 } }, status) : null),
+				section("Persona library",
+					h("label", { style: { display: "flex", gap: "8px", alignItems: "center" } }, "Default for new games",
+						h("select", { className: "dsh-tavern-settings-select", disabled: busy || !library.loaded, value: library.defaultId, style: { flex: 1, minWidth: 0 }, onChange: event => update({ defaultPersonaId: event.target.value }) },
+							h("option", { value: "" }, "No persona"), personas.map(item => h("option", { key: item.id, value: item.id }, personaLabel(item, personas))))),
+					library.error ? h("p", { role: "alert", className: "dsh-card-error" }, library.error) : null,
+					h("ul", { style: { listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "8px" } }, personas.map(item => h("li", { key: item.id, style: { display: "flex", gap: "10px", alignItems: "center" } },
+						h(PersonaPortrait, { src: library.portraits[item.id], name: item.name, size: 44 }),
+						h("div", { style: { flex: 1, minWidth: 0 } }, h("div", { style: { fontWeight: 600 } }, personaLabel(item, personas)),
+							h("div", { className: "dsh-tavern-settings-desc", style: { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, item.description ? item.description.replace(/\s+/g, " ").slice(0, 160) : "(no description)")),
+						h("button", { type: "button", className: "dsh-tavern-btn quiet", disabled: busy || !!editing, onClick: () => setEditing({ id: item.id, name: item.name, description: item.description }) }, "Edit"),
+						h("button", { type: "button", className: "dsh-tavern-btn quiet", disabled: busy || !!editing, onClick: () => update({ deletePersona: item.id }, "Delete persona \"" + personaLabel(item, personas) + "\"? Games already started keep it.") }, "Delete")))),
+					editing ? h(PersonaEditor, { key: editing.id || "new", library, initial: editing, onDone: () => setEditing(null) })
+						: h("button", { type: "button", className: "dsh-tavern-btn", disabled: busy || !library.loaded, onClick: () => setEditing({ name: "", description: "" }) }, "New persona")));
+		}
+
 		function createTavernShellFeatureModule() {
 		// One request per loaded client, including failure. No timers or retries.
 		function createHostCompatibilityNotice(load, storage) {
@@ -11107,14 +11247,15 @@ function subscribeTavernHostTheme(win, listener) {
 				try {
 					const globalSettings = await rpc("getTavernSettings");
                     const personas = globalSettings.settings?.personas || [];
+                    const personaPortraits = personas.length ? await rpc("getPersonaPortraits").then(result => result.portraits || {}, () => ({})) : {};
                     const personaId = globalSettings.settings?.defaultPersonaId || "";
                     const defaultPersona = personas.find(function (item) { return item.id === personaId; });
                     const userName = defaultPersona ? defaultPersona.name : globalSettings.settings?.defaultPlaySettings?.playerName || "你";
 					const preparedKey = JSON.stringify([userName, compatibilityAvailable && requestMode === "sillytavern" ? "sillytavern" : "dsh"]);
-					setOpeningPicker({ card: card, requestMode: requestMode, openings: [], index: 0, userName: userName, personas: personas, personaId: personaId, preparing: true });
+					setOpeningPicker({ card: card, requestMode: requestMode, openings: [], index: 0, userName: userName, personas: personas, personaPortraits: personaPortraits, personaId: personaId, preparing: true });
 					const response = await initializeFullOpeningTemplate(await call("getCardOpenings", { previewTransport: "deferred-v1", path: card.path, userName: userName, requestMode: compatibilityAvailable && requestMode === "sillytavern" ? "sillytavern" : "dsh" }));
 					const openings = response.openings || [];
-					setOpeningPicker({ card: card, requestMode: requestMode, preparing: false, preparedKey: preparedKey, preparationId: response.preparationId || "", openings: openings, index: 0, userName: userName, personas: personas, personaId: personaId, trustedCardMode: response.trustedCardMode });
+					setOpeningPicker({ card: card, requestMode: requestMode, preparing: false, preparedKey: preparedKey, preparationId: response.preparationId || "", openings: openings, index: 0, userName: userName, personas: personas, personaPortraits: personaPortraits, personaId: personaId, trustedCardMode: response.trustedCardMode });
 				successful = true;
 				} catch (err) { setOpeningPicker(null); playPrewarmRef.current.cancel(); setError(String(err && err.message || err)); }
 				finally { if (timing) timing.finish(successful); setBusy(false); }
@@ -11396,7 +11537,7 @@ function subscribeTavernHostTheme(win, listener) {
 				h("div", { className: "dsh-tavern-card-picker-head" }, h("button", { className: "dsh-tavern-btn", disabled: busy, onClick: discardOpening }, "放弃开局"), h("span", null, openingPicker.card.name + " · 游戏准备"), h("button", { className: "dsh-tavern-btn", "aria-expanded": !openingSettingsCollapsed, onClick: function () { openingSettingsManual.current = true; setOpeningSettingsCollapsed(function (value) { return !value; }); } }, openingSettingsCollapsed ? "展开设置" : "折叠设置"), h("span", { className: "dsh-tavern-spacer" }), h("button", { className: "dsh-tavern-btn", disabled: busy, onClick: closePicker }, "暂时收起")),
 				busy ? h("div", { className: "dsh-tavern-session-switching", role: "status", "aria-live": "polite" }, openingPicker.preparing ? "正在准备开场与脚本资源…" : "正在完成游戏初始化…", openingPicker.preparing ? h("div", { style: { marginTop: "8px", fontSize: "13px", opacity: .75 } }, "首次打开可能需要下载资源，请稍候；后续打开通常更快。") : null) : null,
 					selectedOpening ? h("div", { hidden: openingSettingsCollapsed },
-						(openingPicker.personas || []).length ? h("label", { className: "dsh-tavern-player-name" }, h("span", null, "Player persona"), h("select", { value: openingPicker.personaId || "", disabled: busy, onChange: function (event) { const personaId = event.target.value; setOpeningPicker(function (current) { const persona = current && (current.personas || []).find(function (item) { return item.id === personaId; }); return current ? Object.assign({}, current, { personaId: personaId }, persona ? { userName: persona.name } : {}) : current; }); } }, h("option", { value: "" }, "No persona"), openingPicker.personas.map(function (item) { return h("option", { key: item.id, value: item.id }, item.name); }))) : null,
+						(openingPicker.personas || []).length ? h("label", { className: "dsh-tavern-player-name" }, h("span", null, "Player persona"), h("span", { style: { display: "flex", gap: "10px", alignItems: "center" } }, h(PersonaPortrait, { src: (openingPicker.personaPortraits || {})[openingPicker.personaId], name: openingPicker.personaId ? openingPicker.userName : "", size: 56 }), h("select", { value: openingPicker.personaId || "", disabled: busy, style: { flex: 1, minWidth: 0 }, onChange: function (event) { const personaId = event.target.value; setOpeningPicker(function (current) { const persona = current && (current.personas || []).find(function (item) { return item.id === personaId; }); return current ? Object.assign({}, current, { personaId: personaId }, persona ? { userName: persona.name } : {}) : current; }); } }, h("option", { value: "" }, "No persona"), openingPicker.personas.map(function (item) { return h("option", { key: item.id, value: item.id }, personaLabel(item, openingPicker.personas)); })))) : null,
 						h("label", { className: "dsh-tavern-player-name" }, h("span", null, "故事中的玩家称呼（可选）"), h("input", { value: openingPicker.userName ?? "", maxLength: 80, placeholder: "你", disabled: busy || Boolean(openingPicker.personaId), title: openingPicker.personaId ? "With a persona selected, the player name is the persona name" : undefined, onChange: function (event) { const userName = event.target.value; setOpeningPicker(function (current) { return current ? Object.assign({}, current, { userName: userName }) : current; }); } })),
 						h("div", { className: "dsh-tavern-player-name-help" }, "可以填写姓名、昵称或身份；默认沿用你上次使用的称呼，也可以在这里针对本局修改。开场白预览会随之更新。")
 					) : null,
@@ -12129,38 +12270,6 @@ function subscribeTavernHostTheme(win, listener) {
                     message ? h("p", { role: "status" }, message) : null);
             }
 
-            // Player personas: who {{user}} is. New games use the default one; each game can switch in its own settings.
-            function PersonaSettings({ settings }) {
-                const h = React.createElement;
-                const [personas, setPersonas] = React.useState(settings.personas || []), [defaultId, setDefaultId] = React.useState(settings.defaultPersonaId || "");
-                const [editing, setEditing] = React.useState(null), [busy, setBusy] = React.useState(false), [message, setMessage] = React.useState("");
-                async function save(patch, done) {
-                    setBusy(true); setMessage("");
-                    try {
-                        const result = await rpc("updateTavernSettings", { patch });
-                        setPersonas(result.settings.personas || []); setDefaultId(result.settings.defaultPersonaId || "");
-                        notifySettingsChanged(); if (done) done(); setMessage("Saved");
-                    } catch (err) { setMessage("Save failed: " + err.message); }
-                    finally { setBusy(false); }
-                }
-                const editor = editing ? h("div", { className: "dsh-tavern-persona-editor" },
-                    h("label", { className: "dsh-local-field" }, "Name (used as {{user}})", h("input", { value: editing.name, maxLength: 80, disabled: busy, onChange: event => setEditing({ ...editing, name: event.target.value }) })),
-                    h("label", { className: "dsh-local-field", style: { display: "flex", flexDirection: "column", alignItems: "stretch", gap: "8px" } }, "Description", h("textarea", { value: editing.description, rows: 18, maxLength: 20000, disabled: busy, style: { width: "100%", minHeight: "360px", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", fontSize: "14px", lineHeight: 1.5, padding: "10px" }, onChange: event => setEditing({ ...editing, description: event.target.value }) })),
-                    h("div", { className: "dsh-tavern-persona-actions" },
-                        h("button", { type: "button", disabled: busy || !editing.name.trim(), onClick: () => save({ savePersona: editing }, () => setEditing(null)) }, "Save"),
-                        h("button", { type: "button", disabled: busy, onClick: () => setEditing(null) }, "Cancel"))) : null;
-                return h("div", { className: "dsh-tavern-settings-section dsh-local-settings dsh-tavern-persona-settings" },
-                    h("section", { className: "dsh-local-section" },
-                        h("label", { className: "dsh-local-field" }, "Default persona for new games", h("select", { disabled: busy, value: defaultId, onChange: event => save({ defaultPersonaId: event.target.value }) },
-                            h("option", { value: "" }, "No persona"), personas.map(item => h("option", { key: item.id, value: item.id }, item.name)))),
-                        h("ul", { className: "dsh-tavern-persona-list" }, personas.map(item => h("li", { key: item.id },
-                            h("span", { className: "dsh-tavern-settings-copy" }, h("strong", null, item.name), h("span", { className: "dsh-tavern-settings-desc" }, item.description ? item.description.slice(0, 120) + (item.description.length > 120 ? "…" : "") : "(no description)")),
-                            h("button", { type: "button", disabled: busy || !!editing, onClick: () => setEditing({ id: item.id, name: item.name, description: item.description }) }, "Edit"),
-                            h("button", { type: "button", disabled: busy || !!editing, onClick: () => { if (window.confirm("Delete persona \"" + item.name + "\"? Games already started keep it.")) save({ deletePersona: item.id }); } }, "Delete")))),
-                        editor || h("button", { type: "button", disabled: busy, onClick: () => setEditing({ name: "", description: "" }) }, "New persona")),
-                    message ? h("p", { role: "status" }, message) : null);
-            }
-
             function TavernSettingsSection() {
                 const [state, setState] = React.useState({ loading: true, busy: false, defaultForegroundModel: null, defaultBackgroundModel: null, defaultWorkbenchModel: null, notice: "", settings: null, modelCatalog: [], sceneImages: false, error: "" });
                 React.useEffect(function () {
@@ -12194,8 +12303,6 @@ function subscribeTavernHostTheme(win, listener) {
                     React.createElement(TavernDefaultModelSetting, { label: "默认后台模型", title: "后台模型", fallback: "跟随前台", selection: state.defaultBackgroundModel, catalog: state.modelCatalog, disabled: state.loading || state.busy, onChange: selection => saveDefault("defaultBackgroundModel", selection) }),
                     React.createElement(TavernDefaultModelSetting, { label: "卡片工作台默认模型", title: "工作台模型", fallback: "跟随前台", selection: state.defaultWorkbenchModel, catalog: state.modelCatalog, disabled: state.loading || state.busy, onChange: selection => saveDefault("defaultWorkbenchModel", selection) })),
                     state.notice ? h("p", { className: "dsh-tavern-gs-notice", role: "status" }, state.notice) : null),
-                    group("Player personas", "The persona name is used as {{user}}; its description is injected right before the character description. Pick one when starting a game, or switch later in the game's own settings.",
-                        state.settings ? h(PersonaSettings, { settings: state.settings }) : null),
                     group("新游戏默认", "开局时继承，开局后可在本局设置中单独修改。",
                         state.settings ? h(GlobalPlayDefaults, { settings: state.settings }) : null,
                         h(TavernConversationWritingSkills, { globalDefaults: true })),
@@ -14690,6 +14797,7 @@ function subscribeTavernHostTheme(win, listener) {
 			function TavernStatusPanel(props) {
             const askConfirm = useTavernConfirm(props.sessionId || props.scope?.sessionId);
 			const [error, setError] = usePersistentError("酒馆状态");
+			const [personaOpen, setPersonaOpen] = React.useState(false);
 			const [guideDraft, setGuideDraft] = React.useState("");
 			const guideInputRef = React.useRef(null);
 			const [guideBusy, setGuideBusy] = React.useState(false);
@@ -14842,7 +14950,9 @@ function subscribeTavernHostTheme(win, listener) {
 					h("div", { className: "dsh-tavern-status-role" }, view.card.name),
                     h("nav", { className: "dsh-tavern-status-resource-links", "aria-label": "本局资料" },
                         h("button", { type: "button", disabled: !view.card.path, onClick: () => props.openStyleTab("dsh-tavern:cards", { cardPath: view.card.path }) }, "打开人物卡 ↗"),
-                        h("button", { type: "button", disabled: !view.card.path || resourceLinkBusy || !currentResourceBinding || noWorldBook || unavailableWorldBook, title: "打开本局人物卡绑定的世界书；多本绑定时打开主世界书", onClick: openWorldBookDetail }, resourceLinkBusy ? "正在打开…" : !currentResourceBinding ? "正在读取世界书…" : noWorldBook ? "未绑定世界书" : unavailableWorldBook ? "世界书不可用" : "打开世界书 ↗")),
+                        h("button", { type: "button", disabled: !view.card.path || resourceLinkBusy || !currentResourceBinding || noWorldBook || unavailableWorldBook, title: "打开本局人物卡绑定的世界书；多本绑定时打开主世界书", onClick: openWorldBookDetail }, resourceLinkBusy ? "正在打开…" : !currentResourceBinding ? "正在读取世界书…" : noWorldBook ? "未绑定世界书" : unavailableWorldBook ? "世界书不可用" : "打开世界书 ↗"),
+                        h("button", { type: "button", "aria-expanded": personaOpen, title: "Player persona for this game, and the persona library", onClick: () => setPersonaOpen(open => !open) }, personaOpen ? "Persona ▴" : "Persona ▾")),
+                    personaOpen ? h(TavernPersonaPanel, { key: props.sessionId, sessionId: props.sessionId }) : null,
                     resourceLinkError ? h("div", { className: "dsh-card-error", role: "status" }, resourceLinkError) : null,
 					(view.card.tags || []).length ? h("div", { className: "dsh-tavern-status-tags" }, (view.card.tags || []).slice(0, 8).map(function (tag) { return h("span", { key: tag, className: "dsh-tavern-status-tag" }, tag); })) : null,
 					h("div", { className: "dsh-tavern-status-settle" }, h("span", { className: "dsh-tavern-status-dot " + (view.settleStatus || "idle") }), statusText)
@@ -15406,35 +15516,6 @@ function subscribeTavernHostTheme(win, listener) {
                 React.createElement("p", { className: "dsh-local-help" }, "离开输入框后保存，仅用于后续内容。"), React.createElement("span", { role: "status", className: "dsh-local-feedback" }, status));
         }
 
-        function TavernLocalPersona(props) {
-            const h = React.createElement;
-            const [data, setData] = React.useState(null), [busy, setBusy] = React.useState(false), [status, setStatus] = React.useState("");
-            React.useEffect(() => {
-                let active = true;
-                Promise.all([rpc("getConversationPersona", { sessionId: props.sessionId }, props.sessionId), rpc("getTavernSettings")]).then(([current, settings]) => {
-                    if (active) setData({ current: current.persona, personas: settings.settings?.personas || [] });
-                }, err => { if (active) setStatus("Failed to load: " + err.message); });
-                return () => { active = false; };
-            }, []);
-            async function change(personaId) {
-                setBusy(true); setStatus("Saving…");
-                try {
-                    const result = await rpc("setConversationPersona", { sessionId: props.sessionId, personaId }, props.sessionId);
-                    setData(current => ({ ...current, current: result.persona })); setStatus("Saved. Player name is now \"" + result.playerName + "\".");
-                    liveTavernView.invalidate(props.sessionId); notifyTavernDataChanged(["sessions"], "play-controls");
-                } catch (err) { setStatus("Save failed: " + err.message); }
-                finally { setBusy(false); }
-            }
-            const current = data?.current, known = current && data.personas.some(item => item.id === current.id);
-            return h("div", { className: "dsh-local-field" },
-                h("label", null, "Player persona", h("select", { className: "dsh-tavern-settings-select", "aria-label": "Player persona for this game", value: current?.id || "", disabled: !data || busy, onChange: event => change(event.target.value) },
-                    h("option", { value: "" }, "No persona"),
-                    current && !known ? h("option", { value: current.id }, current.name + " (deleted from the library)") : null,
-                    (data?.personas || []).map(item => h("option", { key: item.id, value: item.id }, item.name)))),
-                h("p", { className: "dsh-local-help" }, "Injected right before the character description; the persona name becomes the player name. Applies from the next turn."),
-                h("span", { role: "status", className: "dsh-local-feedback" }, status));
-        }
-
         function TavernStatusBarSetting(props) {
             const h = React.createElement;
             const state = useLiveTavernView(props.sessionId, "status-bar-setting");
@@ -15465,7 +15546,6 @@ function subscribeTavernHostTheme(win, listener) {
                     h("p", { className: "dsh-local-intro" }, "仅影响本局，修改后自动保存。已有对话和变量会保留。"),
                     h("section", { className: "dsh-local-section" }, h("h3", null, "基本信息"),
                         h(TavernLocalPlayerName, { key: owner + ":name", sessionId: owner }),
-                        h(TavernLocalPersona, { key: owner + ":persona", sessionId: owner }),
                         h(TavernStatusBarSetting, { key: owner + ":status", sessionId: owner }),
                         h(TavernConversationPreset, { key: owner + ":preset", sessionId: owner }),
                         h(UserPreferenceProfileTab, { key: owner + ":profile", scope: { sessionId: owner }, conversationOnly: true }),

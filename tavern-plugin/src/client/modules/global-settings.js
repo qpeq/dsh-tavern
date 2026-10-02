@@ -42,38 +42,6 @@ function createGlobalSettingsModule({ React, rpc, notifySettingsChanged, TavernD
             message ? h("p", { role: "status" }, message) : null);
     }
 
-    // Player personas: who {{user}} is. New games use the default one; each game can switch in its own settings.
-    function PersonaSettings({ settings }) {
-        const h = React.createElement;
-        const [personas, setPersonas] = React.useState(settings.personas || []), [defaultId, setDefaultId] = React.useState(settings.defaultPersonaId || "");
-        const [editing, setEditing] = React.useState(null), [busy, setBusy] = React.useState(false), [message, setMessage] = React.useState("");
-        async function save(patch, done) {
-            setBusy(true); setMessage("");
-            try {
-                const result = await rpc("updateTavernSettings", { patch });
-                setPersonas(result.settings.personas || []); setDefaultId(result.settings.defaultPersonaId || "");
-                notifySettingsChanged(); if (done) done(); setMessage("Saved");
-            } catch (err) { setMessage("Save failed: " + err.message); }
-            finally { setBusy(false); }
-        }
-        const editor = editing ? h("div", { className: "dsh-tavern-persona-editor" },
-            h("label", { className: "dsh-local-field" }, "Name (used as {{user}})", h("input", { value: editing.name, maxLength: 80, disabled: busy, onChange: event => setEditing({ ...editing, name: event.target.value }) })),
-            h("label", { className: "dsh-local-field", style: { display: "flex", flexDirection: "column", alignItems: "stretch", gap: "8px" } }, "Description", h("textarea", { value: editing.description, rows: 18, maxLength: 20000, disabled: busy, style: { width: "100%", minHeight: "360px", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", fontSize: "14px", lineHeight: 1.5, padding: "10px" }, onChange: event => setEditing({ ...editing, description: event.target.value }) })),
-            h("div", { className: "dsh-tavern-persona-actions" },
-                h("button", { type: "button", disabled: busy || !editing.name.trim(), onClick: () => save({ savePersona: editing }, () => setEditing(null)) }, "Save"),
-                h("button", { type: "button", disabled: busy, onClick: () => setEditing(null) }, "Cancel"))) : null;
-        return h("div", { className: "dsh-tavern-settings-section dsh-local-settings dsh-tavern-persona-settings" },
-            h("section", { className: "dsh-local-section" },
-                h("label", { className: "dsh-local-field" }, "Default persona for new games", h("select", { disabled: busy, value: defaultId, onChange: event => save({ defaultPersonaId: event.target.value }) },
-                    h("option", { value: "" }, "No persona"), personas.map(item => h("option", { key: item.id, value: item.id }, item.name)))),
-                h("ul", { className: "dsh-tavern-persona-list" }, personas.map(item => h("li", { key: item.id },
-                    h("span", { className: "dsh-tavern-settings-copy" }, h("strong", null, item.name), h("span", { className: "dsh-tavern-settings-desc" }, item.description ? item.description.slice(0, 120) + (item.description.length > 120 ? "…" : "") : "(no description)")),
-                    h("button", { type: "button", disabled: busy || !!editing, onClick: () => setEditing({ id: item.id, name: item.name, description: item.description }) }, "Edit"),
-                    h("button", { type: "button", disabled: busy || !!editing, onClick: () => { if (window.confirm("Delete persona \"" + item.name + "\"? Games already started keep it.")) save({ deletePersona: item.id }); } }, "Delete")))),
-                editor || h("button", { type: "button", disabled: busy, onClick: () => setEditing({ name: "", description: "" }) }, "New persona")),
-            message ? h("p", { role: "status" }, message) : null);
-    }
-
     function TavernSettingsSection() {
         const [state, setState] = React.useState({ loading: true, busy: false, defaultForegroundModel: null, defaultBackgroundModel: null, defaultWorkbenchModel: null, notice: "", settings: null, modelCatalog: [], sceneImages: false, error: "" });
         React.useEffect(function () {
@@ -107,8 +75,6 @@ function createGlobalSettingsModule({ React, rpc, notifySettingsChanged, TavernD
             React.createElement(TavernDefaultModelSetting, { label: "默认后台模型", title: "后台模型", fallback: "跟随前台", selection: state.defaultBackgroundModel, catalog: state.modelCatalog, disabled: state.loading || state.busy, onChange: selection => saveDefault("defaultBackgroundModel", selection) }),
             React.createElement(TavernDefaultModelSetting, { label: "卡片工作台默认模型", title: "工作台模型", fallback: "跟随前台", selection: state.defaultWorkbenchModel, catalog: state.modelCatalog, disabled: state.loading || state.busy, onChange: selection => saveDefault("defaultWorkbenchModel", selection) })),
             state.notice ? h("p", { className: "dsh-tavern-gs-notice", role: "status" }, state.notice) : null),
-            group("Player personas", "The persona name is used as {{user}}; its description is injected right before the character description. Pick one when starting a game, or switch later in the game's own settings.",
-                state.settings ? h(PersonaSettings, { settings: state.settings }) : null),
             group("新游戏默认", "开局时继承，开局后可在本局设置中单独修改。",
                 state.settings ? h(GlobalPlayDefaults, { settings: state.settings }) : null,
                 h(TavernConversationWritingSkills, { globalDefaults: true })),

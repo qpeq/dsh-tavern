@@ -70,3 +70,22 @@ test('switching persona mid-game rebuilds the prefix from the frozen card and re
   assert.doesNotMatch(cleared.cardContextSnapshot, /Player persona/)
   await assert.rejects(snapshots.personaReplacement({ ...chat, mode: 'card' }, persona), /only apply to play sessions/)
 })
+
+test('portraits: validated, keyed by existing personas, pruned on delete', async () => {
+  const { createPersonaPortraits } = await import('../tavern-plugin/lib/domain/persona-portraits.js')
+  let stored
+  const store = createPersonaPortraits({
+    async readJson() { return stored },
+    async updateJson(_path, updater) { const next = await updater(stored); if (next !== undefined) stored = next; return stored }
+  })
+  const personas = [{ id: 'a', name: '維' }, { id: 'b', name: '維' }]
+  const png = 'data:image/png;base64,iVBORw0KGgo='
+  assert.deepEqual(await store.set('a', png, personas), { a: png })
+  await assert.rejects(store.set('missing', png, personas), /Persona not found/)
+  await assert.rejects(store.set('a', 'data:text/html;base64,PGI+', personas), /PNG, JPEG, WebP or GIF/)
+  await assert.rejects(store.set('a', 'data:image/png;base64,' + 'A'.repeat(2 * 1024 * 1024), personas), /too large/)
+  await store.set('b', png, personas)
+  await store.prune([personas[1]])
+  assert.deepEqual(stored, { b: png })
+  assert.deepEqual(await store.set('b', null, [personas[1]]), {})
+})

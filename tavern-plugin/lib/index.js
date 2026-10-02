@@ -189,7 +189,8 @@ import { createProfileDataStore } from './profile-data-store.js'
 import { createChatPersistence } from './domain/chat-persistence.js'
 import { createChatJournalStore } from './domain/chat-journal-store.js'
 import { createResourceGraph } from './domain/resource-graph.js'
-import { normalizeBackgroundTasks, applyTavernSettingsPatch, presentTavernSettings, resolveSystemPrompt, findPersona } from './domain/tavern-settings.js'
+import { normalizeBackgroundTasks, applyTavernSettingsPatch, presentTavernSettings, resolveSystemPrompt, findPersona, normalizePersonas } from './domain/tavern-settings.js'
+import { createPersonaPortraits } from './domain/persona-portraits.js'
 import { prompt, SYSTEM_PROMPT_DEFINITIONS, SYSTEM_PROMPT_NAMES } from './prompt-catalog.js'
 // dsh-tavern 宿主插件（profile 组合行）
 // RPC：同源 HTTP 路由 /api/dsh-tavern/<method>（客户端 fetch 调用）
@@ -329,6 +330,7 @@ export async function apply(ctx) {
   const readPromptTemplateGlobalVariables = promptTemplateGlobalVariables.read
   const writePromptTemplateGlobalVariables = promptTemplateGlobalVariables.save
   let tavernSettingsDocument = await profileData.readJson(settingsPath)
+  const personaPortraits = createPersonaPortraits(profileData)
   function promptDefaults() {
     return Object.fromEntries(SYSTEM_PROMPT_NAMES.map(function (name) { return [name, prompt(name)] }))
   }
@@ -344,6 +346,7 @@ export async function apply(ctx) {
     tavernSettingsDocument = await profileData.updateJson(settingsPath, function (current) {
       return applyTavernSettingsPatch(current, patch)
     })
+    if (patch && Object.hasOwn(patch, 'deletePersona')) await personaPortraits.prune(normalizePersonas(tavernSettingsDocument?.personas))
     return presentTavernSettings(tavernSettingsDocument, promptDefaults())
   }
   function runtimePrompt(name) {
@@ -3697,6 +3700,14 @@ export async function apply(ctx) {
         return { statusBarPlacement: args.placement }
       }
       case 'setPlayerName': return { playerName: await setPlayerName(args && args.sessionId, args && args.userName) }
+      case 'getPersonaPortraits': {
+        await readTavernSettings()
+        return { portraits: await personaPortraits.read(normalizePersonas(tavernSettingsDocument?.personas)) }
+      }
+      case 'setPersonaPortrait': {
+        await readTavernSettings()
+        return { portraits: await personaPortraits.set(str(args?.personaId), args?.dataUrl ?? null, normalizePersonas(tavernSettingsDocument?.personas)) }
+      }
       case 'getConversationPersona': {
         const chat = await chatForSession(str(args?.sessionId))
         if (!chat || groupOfMode(chat.mode) !== 'play') throw new Error('Open a play session first')

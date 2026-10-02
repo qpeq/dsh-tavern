@@ -130,6 +130,7 @@
 			function TavernStatusPanel(props) {
             const askConfirm = useTavernConfirm(props.sessionId || props.scope?.sessionId);
 			const [error, setError] = usePersistentError("酒馆状态");
+			const [personaOpen, setPersonaOpen] = React.useState(false);
 			const [guideDraft, setGuideDraft] = React.useState("");
 			const guideInputRef = React.useRef(null);
 			const [guideBusy, setGuideBusy] = React.useState(false);
@@ -282,7 +283,9 @@
 					h("div", { className: "dsh-tavern-status-role" }, view.card.name),
                     h("nav", { className: "dsh-tavern-status-resource-links", "aria-label": "本局资料" },
                         h("button", { type: "button", disabled: !view.card.path, onClick: () => props.openStyleTab("dsh-tavern:cards", { cardPath: view.card.path }) }, "打开人物卡 ↗"),
-                        h("button", { type: "button", disabled: !view.card.path || resourceLinkBusy || !currentResourceBinding || noWorldBook || unavailableWorldBook, title: "打开本局人物卡绑定的世界书；多本绑定时打开主世界书", onClick: openWorldBookDetail }, resourceLinkBusy ? "正在打开…" : !currentResourceBinding ? "正在读取世界书…" : noWorldBook ? "未绑定世界书" : unavailableWorldBook ? "世界书不可用" : "打开世界书 ↗")),
+                        h("button", { type: "button", disabled: !view.card.path || resourceLinkBusy || !currentResourceBinding || noWorldBook || unavailableWorldBook, title: "打开本局人物卡绑定的世界书；多本绑定时打开主世界书", onClick: openWorldBookDetail }, resourceLinkBusy ? "正在打开…" : !currentResourceBinding ? "正在读取世界书…" : noWorldBook ? "未绑定世界书" : unavailableWorldBook ? "世界书不可用" : "打开世界书 ↗"),
+                        h("button", { type: "button", "aria-expanded": personaOpen, title: "Player persona for this game, and the persona library", onClick: () => setPersonaOpen(open => !open) }, personaOpen ? "Persona ▴" : "Persona ▾")),
+                    personaOpen ? h(TavernPersonaPanel, { key: props.sessionId, sessionId: props.sessionId }) : null,
                     resourceLinkError ? h("div", { className: "dsh-card-error", role: "status" }, resourceLinkError) : null,
 					(view.card.tags || []).length ? h("div", { className: "dsh-tavern-status-tags" }, (view.card.tags || []).slice(0, 8).map(function (tag) { return h("span", { key: tag, className: "dsh-tavern-status-tag" }, tag); })) : null,
 					h("div", { className: "dsh-tavern-status-settle" }, h("span", { className: "dsh-tavern-status-dot " + (view.settleStatus || "idle") }), statusText)
@@ -808,35 +811,6 @@
                 React.createElement("p", { className: "dsh-local-help" }, "离开输入框后保存，仅用于后续内容。"), React.createElement("span", { role: "status", className: "dsh-local-feedback" }, status));
         }
 
-        function TavernLocalPersona(props) {
-            const h = React.createElement;
-            const [data, setData] = React.useState(null), [busy, setBusy] = React.useState(false), [status, setStatus] = React.useState("");
-            React.useEffect(() => {
-                let active = true;
-                Promise.all([rpc("getConversationPersona", { sessionId: props.sessionId }, props.sessionId), rpc("getTavernSettings")]).then(([current, settings]) => {
-                    if (active) setData({ current: current.persona, personas: settings.settings?.personas || [] });
-                }, err => { if (active) setStatus("Failed to load: " + err.message); });
-                return () => { active = false; };
-            }, []);
-            async function change(personaId) {
-                setBusy(true); setStatus("Saving…");
-                try {
-                    const result = await rpc("setConversationPersona", { sessionId: props.sessionId, personaId }, props.sessionId);
-                    setData(current => ({ ...current, current: result.persona })); setStatus("Saved. Player name is now \"" + result.playerName + "\".");
-                    liveTavernView.invalidate(props.sessionId); notifyTavernDataChanged(["sessions"], "play-controls");
-                } catch (err) { setStatus("Save failed: " + err.message); }
-                finally { setBusy(false); }
-            }
-            const current = data?.current, known = current && data.personas.some(item => item.id === current.id);
-            return h("div", { className: "dsh-local-field" },
-                h("label", null, "Player persona", h("select", { className: "dsh-tavern-settings-select", "aria-label": "Player persona for this game", value: current?.id || "", disabled: !data || busy, onChange: event => change(event.target.value) },
-                    h("option", { value: "" }, "No persona"),
-                    current && !known ? h("option", { value: current.id }, current.name + " (deleted from the library)") : null,
-                    (data?.personas || []).map(item => h("option", { key: item.id, value: item.id }, item.name)))),
-                h("p", { className: "dsh-local-help" }, "Injected right before the character description; the persona name becomes the player name. Applies from the next turn."),
-                h("span", { role: "status", className: "dsh-local-feedback" }, status));
-        }
-
         function TavernStatusBarSetting(props) {
             const h = React.createElement;
             const state = useLiveTavernView(props.sessionId, "status-bar-setting");
@@ -867,7 +841,6 @@
                     h("p", { className: "dsh-local-intro" }, "仅影响本局，修改后自动保存。已有对话和变量会保留。"),
                     h("section", { className: "dsh-local-section" }, h("h3", null, "基本信息"),
                         h(TavernLocalPlayerName, { key: owner + ":name", sessionId: owner }),
-                        h(TavernLocalPersona, { key: owner + ":persona", sessionId: owner }),
                         h(TavernStatusBarSetting, { key: owner + ":status", sessionId: owner }),
                         h(TavernConversationPreset, { key: owner + ":preset", sessionId: owner }),
                         h(UserPreferenceProfileTab, { key: owner + ":profile", scope: { sessionId: owner }, conversationOnly: true }),

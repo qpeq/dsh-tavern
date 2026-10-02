@@ -612,6 +612,8 @@ window.__ModuleLoader__.load({
 
 // @include features/card-list.js
 
+// @include features/personas.js
+
 // @include features/sidebar.js
 
 // @include features/scene-images.js
