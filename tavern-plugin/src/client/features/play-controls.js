@@ -598,7 +598,7 @@
 			}
 			function openRegeneration(event) {
 				if (!canRollback || frontRunning || (activity.busy && !settlementActive) || regenBusy) return;
-				setCandidatePanel(null);
+				setCandidatePanel(null); setInlineBodyEdit(null);
 				setRegenPanel(regenerationPanelFor(event, "input"));
 			}
 			// A failed tail has nothing to replace: one click clears the
@@ -690,66 +690,24 @@
                 title: "恢复第 " + turn + " 轮正文和状态；新的操作会使此恢复点失效" }, busy ? "恢复中…" : "撤销回退（恢复第 " + turn + " 轮）");
         }
 
-		const bodyEditPanel = { value: null, listeners: new Set() };
-		function setBodyEditPanel(value) {
-			bodyEditPanel.value = value;
-			bodyEditPanel.listeners.forEach(function (listener) { listener(value); });
-		}
-		function useBodyEditPanel() {
-			const [value, setValue] = React.useState(bodyEditPanel.value);
-			React.useEffect(function () { bodyEditPanel.listeners.add(setValue); return function () { bodyEditPanel.listeners.delete(setValue); }; }, []);
-			return value;
-		}
+		// 编辑正文 sits in the dock right after 重新生成正文 and edits the latest reply in place (inline-body-edit.js).
 		function TavernEditBodyAction(props) {
 			const [busy, setBusy] = React.useState(false);
+			const editing = useInlineBodyEdit();
 			const running = props.useSession(function (snapshot) { return snapshot.running === true; });
 			const latestMessageId = props.useChat(latestTavernAssistantMessageId);
 			const live = useLiveTavernView(props.sessionId, "edit:" + String(running) + ":" + String(latestMessageId));
 			const coordination = useTavernCoordination(props.sessionId, String(running));
 			const activity = describeTavernActivity(coordination.view && coordination.view.activity);
+			const active = editing && editing.sessionId === props.sessionId;
 			async function openEditor() {
 				setBusy(true);
-				try {
-					const result = await rpc("getBodyEdit", {}, props.sessionId);
-					setRegenPanel(null); setCandidatePanel(null); setCandidateGuidePanel(null);
-					setBodyEditPanel({ sessionId: props.sessionId, edit: result.edit, texts: result.edit.parts.filter(function (part) { return part.kind === "text"; }).map(function (part) { return part.text; }), busy: false, error: "" });
-				} catch (error) { tavernErrorHub.report("编辑正文", error); }
+				try { setRegenPanel(null); setCandidatePanel(null); setCandidateGuidePanel(null); await openInlineBodyEdit(props.sessionId); }
+				catch (error) { tavernErrorHub.report("编辑正文", error); }
 				finally { setBusy(false); }
 			}
 			if (!live.view || !(live.view.canEditBody ?? live.view.canRollback)) return null;
-			return React.createElement("button", { role: "menuitem", disabled: busy || running || activity.busy, onClick: openEditor }, busy ? "读取中…" : "编辑正文");
-		}
-		function BodyEditPanel(props) {
-			const panel = useBodyEditPanel();
-			const running = props.useSession(function (snapshot) { return snapshot.running === true; });
-			const h = React.createElement;
-			if (!panel || panel.sessionId !== props.sessionId) return null;
-			async function save() {
-				setBodyEditPanel(Object.assign({}, panel, { busy: true, error: "" }));
-				try {
-					const result = await rpc("saveBodyEdit", { token: panel.edit.token, texts: panel.texts }, props.sessionId);
-					liveTavernView.setView(props.sessionId, result.view);
-					notifyTavernDataChanged(["sessions"], "play-controls");
-					tavernCoordination.invalidate(props.sessionId);
-					setBodyEditPanel(null);
-				} catch (error) { setBodyEditPanel(Object.assign({}, panel, { busy: false, error: String(error.message || error) })); }
-			}
-			let textIndex = 0;
-			return h("div", { className: "dsh-tavern-question", role: "region", "aria-label": "编辑正文" },
-				h("div", { className: "dsh-tavern-question-head" }, h("span", null, "编辑正文")),
-				panel.error ? h("div", { className: "dsh-tavern-choice-error", role: "alert" }, panel.error) : null,
-				h("div", { style: { maxHeight: "50vh", overflowY: "auto" } }, panel.edit.parts.map(function (part, index) {
-					if (part.kind === "html") return h("div", { key: index, className: "dsh-tavern-question-sub" }, "HTML 内容保持原样");
-					if (part.kind !== "text") return null;
-					const current = textIndex++;
-					return h("textarea", { key: index, className: "dsh-tavern-regen-input", "aria-label": "正文文本 " + (current + 1), rows: Math.min(12, Math.max(3, panel.texts[current].split("\n").length)), value: panel.texts[current], disabled: panel.busy, onChange: function (event) {
-						const texts = panel.texts.slice(); texts[current] = event.target.value;
-						setBodyEditPanel(Object.assign({}, panel, { texts: texts }));
-					} });
-				})),
-				h("div", { className: "dsh-tavern-question-foot" },
-					h("button", { className: "dsh-tavern-question-primary", disabled: panel.busy || running, onClick: save }, panel.busy ? "保存中…" : "保存"),
-					h("button", { className: "dsh-tavern-question-free", disabled: panel.busy, onClick: function () { setBodyEditPanel(null); } }, "取消")));
+			return React.createElement("button", { type: "button", className: "dsh-tavern-choice-trigger", "aria-pressed": active || undefined, disabled: busy || running || activity.busy || active, title: "Edit the latest reply in place", onClick: openEditor }, busy ? "读取中…" : active ? "编辑中…" : "编辑正文");
 		}
 
         // @include modules/background-wait.js
@@ -959,7 +917,6 @@
 				React.createElement("button", { ref: trigger, type: "button", className: "dsh-tavern-choice-trigger", "aria-haspopup": "menu", "aria-expanded": open, onClick: function () { setOpen(function (value) { return !value; }); } }, "更多 ▾"),
 				React.createElement("div", { className: "dsh-tavern-more-menu", role: "menu", hidden: !open, style: placement || undefined, onClick: function (event) { if (event.target && event.target.closest && event.target.closest("button:not(:disabled)")) setOpen(false); } },
                     React.createElement(TavernStopBackgroundAction, Object.assign({}, props, { inMenu: true })),
-					React.createElement(TavernEditBodyAction, props),
 					React.createElement(TavernRollbackAction, props),
                     React.createElement(TavernUndoRollbackAction, props),
 					React.createElement(TavernCompactionAction, Object.assign({}, props, { inMenu: true })))
@@ -979,6 +936,7 @@
 			if (address) return isPlayMode(sessionMode) ? h("div", { className: "dsh-tavern-dock-actions" }, h(TavernStopBackgroundAction, { sessionId: ownerSessionId })) : null;
 			return h("div", { className: "dsh-tavern-dock-actions" },
 				isPlayMode(sessionMode) && latestMessageId ? React.createElement(CandidateAction, Object.assign({}, props, { messageId: latestMessageId })) : null,
+				isPlayMode(sessionMode) && latestMessageId ? React.createElement(TavernEditBodyAction, props) : null,
 				isPlayMode(sessionMode) && !running && live.view && !live.view.canClearIncompleteReply && live.view.releaseCapabilities && live.view.releaseCapabilities.sceneImages ? React.createElement(SceneImageAction, { key: props.sessionId + ":" + imageTurn, sessionId: props.sessionId, turn: imageTurn, running: running }) : null,
 				isPlayMode(sessionMode) ? React.createElement(TavernMoreActions, props) : React.createElement(TavernCompactionAction, props),
                 live.view && live.view.contextCompaction && (live.view.contextCompaction.warning || live.view.contextCompaction.operation && live.view.contextCompaction.operation.status === "running") ? h("span", { role: "status", className: "dsh-tavern-settings-desc" }, live.view.contextCompaction.warning || "正在压缩前后台上下文…") : null
@@ -1332,7 +1290,7 @@
 			)), "dsh-tavern: candidate guide panel");
 			ctx.effect(() => slots.inject("conversation.input.dock", () => slots.register(
 				{ name: "conversation.input.dock", id: "dsh-tavern-regen", order: -110, label: "重新生成正文" },
-				function (props) { return React.createElement(React.Fragment, null, React.createElement(RegenPanel, props), React.createElement(BodyEditPanel, props)); }
+				function (props) { return React.createElement(RegenPanel, props); }
 			)), "dsh-tavern: regen body panel");
 		}
 		return Object.freeze({ register: register });

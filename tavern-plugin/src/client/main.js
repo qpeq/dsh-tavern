@@ -608,6 +608,8 @@ window.__ModuleLoader__.load({
 
 // @include ui/message-frame.js
 
+// @include features/inline-body-edit.js
+
 // @include features/assistant-renderer.js
 
 // @include features/card-list.js
