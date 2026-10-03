@@ -555,6 +555,17 @@
   config:
     search: true
     fetch: false
+# Where the web UI listens: DSH_TAVERN_BIND_HOST is set by the launcher from DSH_TAVERN_BIND
+# (bin/launcher-environment.mjs resolveBindHost): unset = DSH's loopback default, 0.0.0.0 = all
+# interfaces (the token URL is still required). DSH's own `--host 0.0.0.0` flag stays refused; this
+# replaces the webserver row's config from @deepseek-ai/dsh-web-app with only `host` changed.
+- id: webserver
+  config:
+    host: !!js process.env.DSH_TAVERN_BIND_HOST || ctx.webStartup.host || '127.0.0.1'
+    port: !!js ctx.webStartup.port ?? 3080
+    compression: gzip
+    compressionLevel: 1
+    compressionThresholdBytes: 1024
 - insert:
     - id: tavern-cordis-inspect
       name: ./tavern-plugin/lib/cordis-inspect.js

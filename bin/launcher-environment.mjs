@@ -10,6 +10,7 @@ export const PROFILE = 'tavern'
 export const INSTALL_HOSTS = new Set(['cli', 'desktop', 'android'])
 export const CLI_HOST = '127.0.0.1'
 export const CLI_PORT = resolveServicePort(process.env.DSH_TAVERN_PORT)
+export const BIND_HOST = resolveBindHost(process.env.DSH_TAVERN_BIND)
 export const SCRIPT_PATH = fileURLToPath(new URL('./dsh-tavern.mjs', import.meta.url))
 export const SOURCE_ROOT = path.resolve(path.dirname(SCRIPT_PATH), '..')
 const installationFile = path.join(SOURCE_ROOT, '.dsh-tavern-local.json')
@@ -33,6 +34,7 @@ export function runtimeEnvironment() {
   // pnpm's optional update check can keep Node alive after a completed install.
   return { ...environment, npm_config_registry: registry, pnpm_config_registry: registry,
     pnpm_config_update_notifier: 'false', DSH_HOME: DSH_ROOT, DSH_TAVERN_RUNTIME_HOST: RUNTIME_HOST,
+    DSH_TAVERN_BIND_HOST: BIND_HOST === CLI_HOST ? '' : BIND_HOST,
     ...(RUNTIME_HOST === 'cli' ? { DSH_TAVERN_CLI_HOME: DSH_ROOT, DSH_TAVERN_LEGACY_DSH_HOME: LEGACY_DSH_ROOT } : {}) }
 }
 export const PROFILE_DIR = path.join(DSH_ROOT, 'profiles', PROFILE)
@@ -86,6 +88,26 @@ export function resolveServicePort(value, fallback = 3081) {
     throw new Error(`DSH_TAVERN_PORT 必须是 1 到 65535 之间的整数，当前值：${value}`)
   }
   return port
+}
+
+// DSH_TAVERN_BIND: where the web UI listens. Unset/127.0.0.1/localhost = loopback only (the default);
+// 0.0.0.0 or any IPv4 address of this machine = all interfaces, because the DSH web server can only bind
+// 127.0.0.1 or 0.0.0.0. Every request still needs the token URL.
+export function resolveBindHost(value) {
+  const host = String(value ?? '').trim()
+  if (host === '' || host === '127.0.0.1' || host === 'localhost') return '127.0.0.1'
+  if (/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(host) && host.split('.').every((part) => Number(part) <= 255)) return '0.0.0.0'
+  throw new Error(`DSH_TAVERN_BIND must be 127.0.0.1, 0.0.0.0 or an IPv4 address, got: ${value}`)
+}
+
+// The LAN URLs to print: the address DSH_TAVERN_BIND names, or with 0.0.0.0 every external IPv4 one.
+export function lanWebUrls(url, bind = process.env.DSH_TAVERN_BIND, interfaces = os.networkInterfaces()) {
+  if (!url || resolveBindHost(bind) !== '0.0.0.0') return []
+  const named = String(bind).trim()
+  if (named !== '0.0.0.0') { const lan = new URL(url); lan.hostname = named; return [lan.href] }
+  return Object.values(interfaces).flat()
+    .filter((iface) => iface && iface.family === 'IPv4' && !iface.internal)
+    .map((iface) => { const lan = new URL(url); lan.hostname = iface.address; return lan.href })
 }
 
 export function sleep(milliseconds) {

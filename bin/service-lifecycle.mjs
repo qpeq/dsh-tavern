@@ -7,11 +7,11 @@ import { resolveDshCliEntry } from './plugin-dependencies.mjs'
 import path from 'node:path'
 import { migrateSessionPrefixEvents } from './session-prefix-migration.mjs'
 import { ensureSidebarDefaults } from './launcher-settings.mjs'
-import { PROFILE_DIR, PID_FILE, PROFILE, SOURCE_ROOT, CLI_PORT, CLI_HOST, LOG_DIR, LOG_FILE, DSH_ROOT, FRONTEND_BOOTSTRAP_FILE, FRONTEND_BOOTSTRAP_VERSION, commandExists, runtimeEnvironment, RUNTIME_HOST, findDshCommand, resolveDshInvocation, sleep } from './launcher-environment.mjs'
+import { PROFILE_DIR, PID_FILE, PROFILE, SOURCE_ROOT, CLI_PORT, CLI_HOST, LOG_DIR, LOG_FILE, DSH_ROOT, FRONTEND_BOOTSTRAP_FILE, FRONTEND_BOOTSTRAP_VERSION, lanWebUrls, commandExists, runtimeEnvironment, RUNTIME_HOST, findDshCommand, resolveDshInvocation, sleep } from './launcher-environment.mjs'
 
 // Own process identity, readiness, shutdown, and validated browser access.
 export function webUrlFromLogChunk(source) {
-  const matches = [...String(source || '').matchAll(/^dsh web: (https?:\/\/\S+)$/gm)]
+  const matches = [...String(source || '').matchAll(/^dsh web: (https?:\/\/\S+)(?: \(LAN: \S+\))?\r?$/gm)]
   return matches.length > 0 ? matches[matches.length - 1][1] : ''
 }
 
@@ -215,6 +215,7 @@ function printServiceWebUrl(url) {
     return
   }
   console.log(`打开网页（请复制完整地址）：${url}`)
+  for (const lan of lanWebUrls(url)) console.log(`LAN (DSH_TAVERN_BIND=${process.env.DSH_TAVERN_BIND}): ${lan}`)
   console.log('带 token 的地址包含访问凭证，请勿分享。关掉页面后可运行 dsh-tavern open 重新打开。')
 }
 

@@ -8,6 +8,8 @@ import { promisify } from 'node:util'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { resolveServiceWebUrl } from '../bin/dsh-tavern.mjs'
+import { webUrlFromLogChunk } from '../bin/service-lifecycle.mjs'
+import { lanWebUrls, resolveBindHost } from '../bin/launcher-environment.mjs'
 
 const execute = promisify(execFile)
 const launcher = fileURLToPath(new URL('../bin/dsh-tavern.mjs', import.meta.url))
@@ -105,4 +107,29 @@ test('实际 CLI 的 status、重复 start、open 都使用当前链接；过期
   assert.ok(!stdout.includes('token=expired'))
   await assert.rejects(run('open'), error => error.code === 1 && error.stdout.includes('尚未取得有效'))
   await assert.rejects(readFile(opened), { code: 'ENOENT' })
+})
+
+test('DSH_TAVERN_BIND: loopback by default, any IPv4 address means all interfaces', () => {
+  for (const value of [undefined, '', ' ', '127.0.0.1', 'localhost']) assert.equal(resolveBindHost(value), '127.0.0.1')
+  for (const value of ['0.0.0.0', '192.168.1.113', ' 10.0.0.2 ']) assert.equal(resolveBindHost(value), '0.0.0.0')
+  for (const value of ['example.com', '192.168.1.300', '::', '1.2.3']) assert.throws(() => resolveBindHost(value), /DSH_TAVERN_BIND/)
+})
+
+test('the token URL is still found when the runtime appends its LAN URL', () => {
+  const log = 'dsh web: http://127.0.0.1:3081/?token=t1 (LAN: http://192.168.1.113:3081/?token=t1)\n'
+  assert.equal(webUrlFromLogChunk(log), 'http://127.0.0.1:3081/?token=t1')
+})
+
+test('LAN URLs: the named address, or with 0.0.0.0 one per external IPv4 address', () => {
+  const interfaces = {
+    lo: [{ family: 'IPv4', internal: true, address: '127.0.0.1' }],
+    eth0: [{ family: 'IPv4', internal: false, address: '192.168.1.113' }, { family: 'IPv6', internal: false, address: 'fe80::1' }],
+  }
+  const url = 'http://127.0.0.1:3081/?token=t1'
+  assert.deepEqual(lanWebUrls(url, '0.0.0.0', interfaces), ['http://192.168.1.113:3081/?token=t1'])
+  assert.deepEqual(lanWebUrls(url, '127.0.0.1', interfaces), [])
+  assert.deepEqual(lanWebUrls(url, undefined, interfaces), [])
+  assert.deepEqual(lanWebUrls(url, '192.168.1.113', { ...interfaces, docker0: [{ family: 'IPv4', internal: false, address: '172.18.0.1' }] }),
+    ['http://192.168.1.113:3081/?token=t1'])
+  assert.deepEqual(lanWebUrls('', '0.0.0.0', interfaces), [])
 })
