@@ -566,6 +566,13 @@
     compression: gzip
     compressionLevel: 1
     compressionThresholdBytes: 1024
+# Browser login lifetime: opening the token URL once sets a signed cookie (its key is kept on disk, so it
+# survives restarts). DSH's default is 30 days; 10 years here (Chrome caps a cookie at 400 days anyway).
+# Replaces the connection row's config from @deepseek-ai/dsh-web-app with only cookieMaxAgeDays added.
+- id: connection
+  config:
+    trustedHosts: !!js ctx.webRuntime.trustedHosts
+    cookieMaxAgeDays: 3650
 - insert:
     - id: tavern-cordis-inspect
       name: ./tavern-plugin/lib/cordis-inspect.js
