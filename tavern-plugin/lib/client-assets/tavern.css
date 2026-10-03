@@ -2596,3 +2596,21 @@ details.dsh-tavern-recall-guide > summary .dsh-tavern-recall-guide-heading > spa
 .dsh-tavern-recall-notes { margin: 10px 14px 0; padding: 10px 12px; border: 1px dashed var(--dsw-alias-border-l2); border-radius: 10px; }
 .dsh-tavern-recall-notes > b { color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 650; }
 .dsh-tavern-recall-notes ul { margin: 6px 0 0; padding-left: 18px; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 1.7; }
+
+/* Fork: the opening (greeting) picker keeps one size while you switch openings, instead of sizing to each
+   opening. Head, nav and foot stay put; the opening text fills the rest and scrolls inside. With the settings
+   expanded the text keeps at least 160px and the dialog scrolls. On a phone the dialog fills the screen. */
+.dsh-tavern-picker-overlay:has(.dsh-tavern-greeting-preview) { padding: 24px; }
+.dsh-tavern-card-picker:has(.dsh-tavern-greeting-preview) {
+  width: min(900px, calc(100vw - 48px)); height: min(820px, calc(100dvh - 48px)); max-height: none; padding-block: 16px;
+}
+.dsh-tavern-card-picker:has(.dsh-tavern-greeting-preview) :is(.dsh-tavern-card-picker-head, .dsh-tavern-greeting-nav, .dsh-tavern-picker-foot) { flex-shrink: 0; }
+.dsh-tavern-card-picker:has(.dsh-tavern-greeting-preview) .dsh-tavern-greeting-preview { flex: 1 1 0; height: auto; min-height: 160px; max-height: none; overflow: auto; }
+@media (max-width: 767px) {
+  .dsh-tavern-picker-overlay:has(.dsh-tavern-greeting-preview) { padding: 0; align-items: stretch; }
+  .dsh-tavern-card-picker:has(.dsh-tavern-greeting-preview) {
+    width: 100%; height: var(--dsh-vv-height, 100dvh); border: 0; border-radius: 0;
+    padding: max(10px, env(safe-area-inset-top, 0px)) 12px max(10px, env(safe-area-inset-bottom, 0px));
+  }
+  .dsh-tavern-card-picker:has(.dsh-tavern-greeting-preview) .dsh-tavern-greeting-preview { min-height: 120px; }
+}
