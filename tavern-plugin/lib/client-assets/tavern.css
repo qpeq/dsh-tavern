@@ -1853,7 +1853,12 @@ body.dsh-tavern-shell-active > :is([role="tree"], [role="menu"], [role="listbox"
 html.dsh-tavern-hide-process [data-chat-flow-kind="context"],
 html.dsh-tavern-hide-process [data-chat-flow-kind="system-prompt"],
 html.dsh-tavern-hide-process .dsh-tavern-assistant-reasoning,
-html.dsh-tavern-hide-process [data-chat-flow-kind="turn-process"]:has([data-turn-process-tool-calls="0"][data-turn-process-subagents="0"]) { display: none !important; }
+html.dsh-tavern-hide-process [data-chat-flow-kind="turn-process"]:has([data-turn-process-tool-calls="0"][data-turn-process-subagents="0"]),
+/* Fork: also the slash-command echo rows ("permission · preset …") and, in the turn tail, the usage and
+   time panels and the clock; the tail's copy/branch/assistant action buttons stay. */
+html.dsh-tavern-hide-process [data-chat-flow-kind="command"],
+html.dsh-tavern-hide-process [data-turn-tail] [class*="_actions"] > span[class*="_root"]:has(> button[class*="_trigger"]),
+html.dsh-tavern-hide-process [data-turn-tail] [class*="_timeEnd"] { display: none !important; }
 
 .dsh-tavern-display-preferences .dsh-tavern-settings-desc { margin: 6px 0 0; }
 .dsh-tavern-display-preferences > [role="status"] { margin: 0; padding: 0 20px 18px; }

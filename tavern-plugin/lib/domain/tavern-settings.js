@@ -176,7 +176,8 @@ export function presentTavernSettings(document, defaults) {
     defaultBackgroundModel: normalizeBackgroundModel(object(document).defaultBackgroundModel),
     defaultWorkbenchModel: normalizeBackgroundModel(object(document).defaultWorkbenchModel),
     contextCompaction: compactionPolicy(object(document).contextCompaction),
-    hideContextAndReasoning: object(document).hideContextAndReasoning === true,
+    // Fork: indicators (context injection, system prompt, thinking, turn usage/time, command rows) are hidden unless shown.
+    hideContextAndReasoning: object(document).hideContextAndReasoning !== false,
     candidateDismissMode: object(document).candidateDismissMode === 'after-send' ? 'after-send' : 'after-fill',
     compatibilityMode: false,
     sillyModeEnabled: false,

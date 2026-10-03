@@ -22,3 +22,21 @@ test('隐藏注入和思考时保留正文、工具、错误，关闭后恢复�
   assert.equal(document.body.innerHTML, before)
   dom.window.close()
 })
+
+test('fork: hiding also covers command rows and the turn tail usage/time/clock, keeping its action buttons', () => {
+  const dom = new JSDOM(`<style>${css.slice(css.indexOf('/* Presentation only:'))}</style><body>
+    <div id="command" data-chat-flow-kind="command">permission · preset workspace-write</div>
+    <div data-chat-flow-kind="turn-tail"><div data-turn-tail="3"><div class="xzv4MW_actions TS9iAW_actions">
+      <button id="copy" class="xzv4MW_action">copy</button>
+      <span id="usage" class="Q51KRG_root"><button class="Q51KRG_trigger"><span class="Q51KRG_label">用量 4.5K tok</span></button></span>
+      <span id="time" class="Q51KRG_root"><button class="Q51KRG_trigger"><span class="Q51KRG_label">用时 29秒</span></button></span>
+      <span id="clock" class="xzv4MW_timeEnd">17:04</span></div></div></div></body>`)
+  const {document} = dom.window
+  const display = id => dom.window.getComputedStyle(document.getElementById(id)).display
+  document.documentElement.classList.add('dsh-tavern-hide-process')
+  for (const id of ['command', 'usage', 'time', 'clock']) assert.equal(display(id), 'none')
+  assert.notEqual(display('copy'), 'none')
+  document.documentElement.classList.remove('dsh-tavern-hide-process')
+  for (const id of ['command', 'usage', 'time', 'clock', 'copy']) assert.notEqual(display(id), 'none')
+  dom.window.close()
+})

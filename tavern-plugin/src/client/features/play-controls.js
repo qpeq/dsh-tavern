@@ -919,8 +919,26 @@
                     React.createElement(TavernStopBackgroundAction, Object.assign({}, props, { inMenu: true })),
 					React.createElement(TavernRollbackAction, props),
                     React.createElement(TavernUndoRollbackAction, props),
-					React.createElement(TavernCompactionAction, Object.assign({}, props, { inMenu: true })))
+					React.createElement(TavernCompactionAction, Object.assign({}, props, { inMenu: true })),
+					React.createElement(TavernIndicatorsToggle, null))
 			);
+		}
+
+		// Fork: the global "hide context and reasoning" display preference, also reachable from the play menu.
+		// It hides the indicators (context injection, system prompt, thinking, turn usage/time, command rows).
+		function TavernIndicatorsToggle() {
+			const hidden = React.useSyncExternalStore(displayPreferences.subscribe, displayPreferences.snapshot, displayPreferences.snapshot);
+			const [busy, setBusy] = React.useState(false);
+			async function toggle() {
+				setBusy(true);
+				try { await displayPreferences.save(!hidden); }
+				catch (error) { tavernErrorHub.report("Show indicators", error); }
+				finally { setBusy(false); }
+			}
+			return React.createElement("button", { type: "button", role: "menuitemcheckbox", "aria-checked": hidden === false,
+				className: "dsh-tavern-indicators-toggle", disabled: hidden === null || busy, onClick: toggle,
+				title: "Context injection, system prompt, thinking, turn usage and time, command rows. Display only; applies to all chats." },
+				(hidden === false ? "✓ " : "") + "Show indicators");
 		}
 
 		function CandidateDockActions(props) {
