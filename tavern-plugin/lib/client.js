@@ -10855,6 +10855,11 @@ function subscribeTavernHostTheme(win, listener) {
             };
         })();
 
+        function buttonizeIsRegex(heading) {
+            const text = String(heading || "").trim();
+            return text.length > 2 && text.startsWith("/") && text.endsWith("/");
+        }
+
         function buttonizeHeadingMatcher(heading) {
             const text = String(heading || "").trim();
             if (text.length > 2 && text.startsWith("/") && text.endsWith("/")) {
@@ -10995,18 +11000,21 @@ function subscribeTavernHostTheme(win, listener) {
                 h("div", { style: { display: "flex", gap: "8px" } },
                     h("button", { type: "submit", className: "dsh-tavern-btn", disabled: busy || !editing.heading.trim() }, editing.id ? "Save" : "Add rule"),
                     h("button", { type: "button", className: "dsh-tavern-btn quiet", disabled: busy, onClick: () => setEditing(null) }, "Cancel"))) : null;
+            // alignContent start: the tab fills the panel's height, and stretched grid rows left big gaps.
             return h("aside", { className: "dsh-tavern-status dsh-tavern-buttonize-tab" },
-                h("div", { className: "dsh-tavern-status-body", style: { display: "grid", gap: "12px" } },
-                    h("section", { className: "dsh-tavern-status-section", style: { display: "grid", gap: "10px" } },
+                h("div", { className: "dsh-tavern-status-body", style: { display: "grid", gap: "12px", alignContent: "start" } },
+                    h("section", { className: "dsh-tavern-status-section", style: { display: "grid", gap: "10px", alignContent: "start" } },
                         h("div", { className: "dsh-tavern-status-label" }, "Buttonize"),
                         h("p", { className: "dsh-tavern-settings-desc", style: { margin: 0 } }, "Turn a list in the replies into buttons: pressing one sends that item as your message. Only the latest reply's buttons work. Rules apply to every chat."),
                         rules === null ? h("div", { className: "dsh-tavern-status-empty" }, "Loading…")
                             : rules.length === 0 && !editing ? h("div", { className: "dsh-tavern-status-empty" }, "No rules yet.") : null,
-                        h("ul", { style: { listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "8px" } }, (rules || []).map(rule => h("li", { key: rule.id, style: { display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", gap: "10px", alignItems: "start", padding: "10px 12px", border: "1px solid var(--dsw-alias-border-l2)", borderRadius: "10px", opacity: rule.enabled ? 1 : .6 } },
+                        h("ul", { style: { listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "8px", alignContent: "start" } }, (rules || []).map(rule => h("li", { key: rule.id, style: { display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", gap: "10px", alignItems: "start", padding: "10px 12px", border: "1px solid var(--dsw-alias-border-l2)", borderRadius: "10px", opacity: rule.enabled ? 1 : .6 } },
                             h("input", { type: "checkbox", role: "switch", "aria-label": "Enable " + rule.name, checked: rule.enabled, disabled: busy, style: { marginTop: "3px" }, onChange: event => update({ saveButtonizeRule: { id: rule.id, heading: rule.heading, enabled: event.target.checked } }) }),
                             h("div", { style: { display: "grid", gap: "3px", minWidth: 0 } },
                                 h("div", { style: { fontWeight: 600, fontSize: "13px", overflowWrap: "anywhere" } }, rule.name),
-                                rule.name !== rule.heading ? h("code", { style: { fontSize: "12px", opacity: .75, overflowWrap: "anywhere" } }, rule.heading) : null,
+                                h("div", { style: { fontSize: "12px", opacity: .8, overflowWrap: "anywhere" } },
+                                    buttonizeIsRegex(rule.heading) ? "Heading matches " : "Heading contains ",
+                                    h("code", null, rule.heading), " → the list after it becomes buttons"),
                                 h("div", { style: { display: "flex", gap: "14px" } },
                                     h("button", { type: "button", style: link, disabled: busy || !!editing, onClick: () => setEditing({ id: rule.id, name: rule.name === rule.heading ? "" : rule.name, heading: rule.heading }) }, "Edit"),
                                     h("button", { type: "button", style: link, disabled: busy || !!editing, onClick: () => update({ deleteButtonizeRule: rule.id }, "Delete the Buttonize rule \"" + rule.name + "\"?") }, "Delete")))))),
