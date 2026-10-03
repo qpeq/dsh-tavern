@@ -11494,6 +11494,45 @@ function subscribeTavernHostTheme(win, listener) {
 				window.addEventListener("dsh-tavern-new-chat-same-card", onNewChatSameCard);
 				return function () { window.removeEventListener("dsh-tavern-new-chat-same-card", onNewChatSameCard); };
 			});
+			// Fork: in the opening picker, ←/→ switch openings and Enter starts the game (as 开始新游戏 does).
+			// Keys typed in the picker's own fields, in another dialog or while composing (IME) are left alone.
+			// The picker is modal: it takes focus when it opens, and listens in the capture phase so that a
+			// field behind it (DSH's chat input keeps focus) never gets the keys, e.g. Enter sending a message.
+			const pickerReady = picking && uiMode === "play" && !collapsed && !!openingPicker && !openingPicker.preparing && !chatImport;
+			React.useEffect(function () {
+				if (!pickerReady) return;
+				const dialog = openingLayoutRef.current;
+				if (!dialog || dialog.contains(document.activeElement)) return;
+				if (!dialog.hasAttribute("tabindex")) dialog.setAttribute("tabindex", "-1");
+				dialog.focus({ preventScroll: true });
+			}, [pickerReady]);
+			React.useEffect(function () {
+				if (!picking || uiMode !== "play" || collapsed || !openingPicker || chatImport) return;
+				function onKey(event) {
+					if (event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+					if (!["ArrowLeft", "ArrowRight", "Enter"].includes(event.key) || busy || openingPicker.preparing) return;
+					const target = event.target instanceof Element ? event.target : null;
+					const inPicker = !!(target && target.closest(".dsh-tavern-card-picker"));
+					if (target && inPicker && target.closest("input, select, textarea, [contenteditable]:not([contenteditable=false])")) return;
+					if (target && !inPicker && target.closest("[role=dialog], [role=alertdialog]")) return;
+					// Enter on a focused button presses that button; arrows still switch openings.
+					if (event.key === "Enter" && target && target.closest("button, a")) return;
+					const count = openingPicker.openings.length;
+					if (event.key === "Enter") {
+						const opening = openingPicker.openings[openingPicker.index];
+						if (count > 0 && !opening) return;
+						event.preventDefault(); event.stopPropagation();
+						newConversation(openingPicker.card, null, opening ? opening.id : "", openingPicker.userName || "你");
+						return;
+					}
+					if (count < 2) return;
+					event.preventDefault(); event.stopPropagation();
+					const step = event.key === "ArrowLeft" ? -1 : 1;
+					setOpeningPicker(Object.assign({}, openingPicker, { index: (openingPicker.index + step + count) % count }));
+				}
+				window.addEventListener("keydown", onKey, true);
+				return function () { window.removeEventListener("keydown", onKey, true); };
+			});
 			async function deleteReplacedChat(item) {
 				const prepared = await call("prepareDeleteChats", { chatIds: [item.chatId] });
 				if (!prepared.results[0].ok) throw new Error(prepared.results[0].error);
