@@ -1317,6 +1317,29 @@
 								: React.createElement("div", { className: "dsh-tavern-status-empty" }, "Open a game to choose its persona.")));
 				}
 			}), "dsh-tavern: Better Sidebar persona tab");
+			// Fork: Buttonize rules tab, and in every chat's input dock the projection that renders their buttons.
+			ctx.effect(() => ctx.betterSidebar.registerTab({
+				id: "dsh-tavern:buttonize",
+				title: "Buttonize",
+				order: 9,
+				single: true,
+				component: function () { return React.createElement(TavernButtonizeTab); }
+			}), "dsh-tavern: Better Sidebar Buttonize tab");
+			ctx.effect(() => slots.inject("conversation.input.dock", () => slots.register(
+				{ name: "conversation.input.dock", id: "dsh-tavern-buttonize", order: -110, label: "Buttonize" },
+				function (props) {
+					return React.createElement(TavernButtonizeDock, Object.assign({}, props, { key: "buttonize:" + props.sessionId,
+						// Like the send button: the chat input's draft, then submit (it queues behind a running turn).
+						sendText: function (sessionId, text) {
+							const scope = ctx.sessions.scope(sessionId);
+							const conversation = ctx.get("conversation");
+							if (!scope || !conversation) return Promise.reject(new Error("The chat input is not available"));
+							const input = conversation.input.for(scope);
+							input.setDraft(text);
+							return Promise.resolve(input.submit("queue"));
+						} }));
+				}
+			)), "dsh-tavern: Buttonize dock");
 			ctx.effect(() => slots.inject("conversation.session.header.utilities", () => slots.register(
 				{ name: "conversation.session.header.utilities", id: "dsh-tavern-conversation-export", order: 90 },
 				function (props) { return React.createElement(TavernConversationExportAction, Object.assign({}, props, { sessions: ctx.sessions })); }

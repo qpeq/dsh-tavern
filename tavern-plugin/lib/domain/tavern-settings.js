@@ -66,6 +66,48 @@ function applyPersonaPatch(next, input) {
   if (personas.length === 0) delete next.personas
 }
 
+// Fork: Buttonize rules. In assistant replies, the list right after a heading matching `heading` (plain text
+// contained in the heading, or /regex/) is rendered as buttons that send the item as the user's message.
+const BUTTONIZE_LIMIT = 50
+
+export function normalizeButtonizeRule(value) {
+  const input = object(value)
+  const id = typeof input.id === 'string' ? input.id.trim() : ''
+  const heading = typeof input.heading === 'string' ? input.heading.trim().slice(0, 200) : ''
+  if (id === '' || heading === '') return null
+  const name = typeof input.name === 'string' && input.name.trim() !== '' ? input.name.trim().slice(0, 80) : heading.slice(0, 80)
+  return { id, name, heading, enabled: input.enabled !== false }
+}
+
+export function normalizeButtonizeRules(value) {
+  const seen = new Set()
+  return (Array.isArray(value) ? value : []).map(normalizeButtonizeRule).filter(rule => rule !== null && !seen.has(rule.id) && seen.add(rule.id)).slice(0, BUTTONIZE_LIMIT)
+}
+
+function applyButtonizePatch(next, input) {
+  let rules = normalizeButtonizeRules(next.buttonizeRules)
+  if (Object.hasOwn(input, 'saveButtonizeRule')) {
+    const patch = object(input.saveButtonizeRule)
+    if (typeof patch.heading !== 'string' || patch.heading.trim() === '' || patch.heading.trim().length > 200) throw new Error('Buttonize: a heading is required (max 200 characters)')
+    if (Object.hasOwn(patch, 'name') && (typeof patch.name !== 'string' || patch.name.length > 80)) throw new Error('Buttonize: name is limited to 80 characters')
+    if (Object.hasOwn(patch, 'enabled') && typeof patch.enabled !== 'boolean') throw new Error('Buttonize: enabled must be true or false')
+    const heading = patch.heading.trim()
+    if (heading.length > 2 && heading.startsWith('/') && heading.endsWith('/')) {
+      try { new RegExp(heading.slice(1, -1)) } catch (error) { throw new Error('Buttonize: invalid regex: ' + error.message) }
+    }
+    const id = typeof patch.id === 'string' && patch.id !== '' ? patch.id : randomUUID()
+    const index = rules.findIndex(rule => rule.id === id)
+    const rule = normalizeButtonizeRule({ ...(index >= 0 ? rules[index] : {}), ...patch, id })
+    if (index >= 0) rules[index] = rule
+    else if (patch.id) throw new Error('Buttonize rule not found; refresh and try again')
+    else if (rules.length >= BUTTONIZE_LIMIT) throw new Error('At most ' + BUTTONIZE_LIMIT + ' Buttonize rules')
+    else rules.push(rule)
+  }
+  if (Object.hasOwn(input, 'deleteButtonizeRule')) rules = rules.filter(rule => rule.id !== input.deleteButtonizeRule)
+  if (rules.length === 0) delete next.buttonizeRules
+  else next.buttonizeRules = rules
+}
+
 export function normalizePlayDefaults(value) {
   const input = object(value)
   return { playerName: typeof input.playerName === 'string' ? input.playerName.trim().slice(0, 80) || '你' : '你',
@@ -78,6 +120,7 @@ export function applyTavernSettingsPatch(current, patch) {
   const next = Object.assign({}, object(current))
   const input = object(patch)
   if (['savePersona', 'deletePersona', 'defaultPersonaId'].some(key => Object.hasOwn(input, key))) applyPersonaPatch(next, input)
+  if (['saveButtonizeRule', 'deleteButtonizeRule'].some(key => Object.hasOwn(input, key))) applyButtonizePatch(next, input)
   if (Object.hasOwn(input, 'defaultPlaySettings')) {
     const patch = object(input.defaultPlaySettings)
     for (const key of ['webSearchEnabled', 'sceneImagesEnabled']) if (Object.hasOwn(patch, key) && typeof patch[key] !== 'boolean') throw new Error('默认开关必须为布尔值')
@@ -170,6 +213,7 @@ export function presentTavernSettings(document, defaults) {
   return {
     defaultPlaySettings: normalizePlayDefaults(object(document).defaultPlaySettings),
     personas: normalizePersonas(object(document).personas),
+    buttonizeRules: normalizeButtonizeRules(object(document).buttonizeRules),
     defaultPersonaId: defaultPersonaId(document),
     defaultDisabledWritingSkills: Array.isArray(object(document).defaultDisabledWritingSkills) ? object(document).defaultDisabledWritingSkills.filter(name => typeof name === 'string') : [],
     defaultForegroundModel: normalizeBackgroundModel(object(document).defaultForegroundModel),

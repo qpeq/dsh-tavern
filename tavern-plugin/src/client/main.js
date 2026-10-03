@@ -616,6 +616,8 @@ window.__ModuleLoader__.load({
 
 // @include features/personas.js
 
+// @include features/buttonize.js
+
 // @include features/sidebar.js
 
 // @include features/scene-images.js
