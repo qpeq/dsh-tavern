@@ -792,6 +792,15 @@ body.dsh-tavern-shell-active [data-dsh-panel-host] { overflow: clip; }
     z-index: 3;
   }
   body.dsh-tavern-shell-active [data-dsh-bottom-toggle] { display: none !important; }
+  /* Full screen on a phone: the folded sidebar rail (56px of a ~390px screen) goes too. The frame sets its
+     columns inline; the rail keeps its grid track at width 0 so the other columns stay in place. An
+     opened sidebar or right panel is left alone. */
+  html.dsh-tavern-play-fullscreen body.dsh-tavern-shell-active [data-sidebar-collapsed][data-rightbar-collapsed] {
+    grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+  }
+  html.dsh-tavern-play-fullscreen body.dsh-tavern-shell-active [data-sidebar-collapsed][data-rightbar-collapsed] > [class*="_sidebarCol"] {
+    border-right: 0 !important;
+  }
 }
 
 .dsh-tavern-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
