@@ -16433,6 +16433,16 @@ function subscribeTavernHostTheme(win, listener) {
                 { name: "conversation.session.header.utilities", id: "session-log-download", order: 0, priority: -1 },
                 () => null
             )), "dsh-tavern: hide host session-log-download");
+            // Fork: skip DSH's "内测声明" onboarding step (welcome-notice). A browser that is not on loopback keeps
+            // DSH settings in memory only, so its acknowledgement never persisted and the notice came back on
+            // every page load. This step completes itself at once, so onboarding moves on to the next step.
+            ctx.effect(() => slots.inject("settings.onboarding", () => slots.register(
+                { name: "settings.onboarding", id: "welcome-notice", order: -100, priority: -1 },
+                function SkipWelcomeNotice(props) {
+                    React.useEffect(function () { if (typeof props.complete === "function") props.complete(); }, []);
+                    return null;
+                }
+            )), "dsh-tavern: skip DSH welcome notice");
             ctx.effect(() => slots.inject("conversation.session.header.actions", () => slots.register(
                 { name: "conversation.session.header.actions", id: "dsh-tavern-immersive", order: 9 },
                 () => React.createElement(TavernImmersiveAction)
