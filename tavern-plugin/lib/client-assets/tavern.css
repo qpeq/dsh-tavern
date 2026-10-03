@@ -2614,3 +2614,8 @@ details.dsh-tavern-recall-guide > summary .dsh-tavern-recall-guide-heading > spa
   }
   .dsh-tavern-card-picker:has(.dsh-tavern-greeting-preview) .dsh-tavern-greeting-preview { min-height: 120px; }
 }
+
+/* Fork: DSH's "回到底部" (scroll to latest) button sits on the text column's right edge and covers the end of
+   lines. Shift it into the chat's empty right margin (40px on desktop and phone). DSH right-aligns it in a
+   sticky slot, so a negative margin moves it without touching the slot. */
+body.dsh-tavern-shell-active [class*="_toBottomSlot"] > button[class*="_toBottom"] { margin-right: -34px; }
