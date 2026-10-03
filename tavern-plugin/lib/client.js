@@ -16198,7 +16198,12 @@ function subscribeTavernHostTheme(win, listener) {
             )), "dsh-tavern: immersive header action");
             ctx.effect(() => slots.inject("conversation.session.header.utilities", () => slots.register(
                 { name: "conversation.session.header.utilities", id: "dsh-tavern-conversation-settings", order: 80 },
-                props => React.createElement(TavernConversationSettingsAction, { ...props, sessions: ctx.sessions, open: sessionId => openTavernSidebarTab(ctx, { type: "dsh-tavern:status" }, { sessionId }) })
+                props => React.createElement(TavernConversationSettingsAction, { ...props, sessions: ctx.sessions, open: sessionId => {
+                    // Fork: a toggle. A shown right panel is hidden (DSH's own collapse action); otherwise 酒馆状态 opens.
+                    const sidebarRight = ctx.get("sidebarRight");
+                    if (sidebarRight && sidebarRight.isExpanded()) { sidebarRight.toggleExpanded(); return; }
+                    return openTavernSidebarTab(ctx, { type: "dsh-tavern:status" }, { sessionId });
+                } })
             )), "dsh-tavern: conversation settings action");
 			ctx.effect(() => ctx.betterSidebar.registerTab({
 				id: "dsh-tavern:status",
