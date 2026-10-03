@@ -89,7 +89,25 @@ export function registerTavernHttpRoutes({
           res.end('forbidden')
           return
         }
-        if (!readsCachedAsset && !readsStaticAsset && !readsOfficialMvu && !readsFullTemplate && !readsRuntimeAsset && !readsClientAsset && !sceneSameOrigin && typeof origin === 'string' && origin !== '' && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin)) {
+        const readsAsset = readsCachedAsset || readsStaticAsset || readsOfficialMvu || readsFullTemplate || readsRuntimeAsset || readsClientAsset
+        // Requests from another machine (the web UI bound to the LAN, DSH_TAVERN_BIND) must pass DSH's
+        // own Host fence and browser login, like DSH's /api; this route is registered on the web server
+        // directly and would otherwise answer anyone who omits Origin. The fence rejects foreign Host
+        // names (DNS rebinding), so the page's own origin can then be accepted. Loopback is unchanged.
+        // Fails closed (401) when DSH's connection service isn't there.
+        const remoteAddress = req.socket?.remoteAddress
+        const remoteClient = typeof remoteAddress === 'string' && !['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remoteAddress)
+        if (remoteClient && !readsAsset) {
+          const connection = ctx.get('connection')
+          const rejection = typeof connection?.requestRejection === 'function' ? connection.requestRejection(req) : 401
+          if (rejection) {
+            res.writeHead(rejection)
+            res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
+            return
+          }
+        }
+        const ownOrigin = remoteClient && (origin === 'http://' + req.headers.host || origin === 'https://' + req.headers.host)
+        if (!readsAsset && !sceneSameOrigin && !ownOrigin && typeof origin === 'string' && origin !== '' && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin)) {
           res.writeHead(403)
           res.end('forbidden')
           return

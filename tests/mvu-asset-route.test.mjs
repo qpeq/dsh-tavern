@@ -77,3 +77,26 @@ test('保存生图配置接受最多 2 MiB 的工作流请求，超过上限在 
     }
   }
 })
+
+test('LAN requests to the Tavern API need DSH login; the page origin is accepted; loopback unchanged', async () => {
+  const url = '/api/dsh-tavern/runtime-generation'
+  const lan = { remoteAddress: '192.168.1.110' }
+  const own = { host: '192.168.1.113:33081', origin: 'http://192.168.1.113:33081' }
+  const ctxWith = connection => ({ ctx: { get: name => name === 'connection' ? connection : undefined } })
+  // No DSH connection service: fail closed.
+  assert.equal((await request(route(ctxWith(undefined)), { url, socket: lan, headers: {} })).status, 401)
+  // DSH says not logged in / foreign Host.
+  assert.equal((await request(route(ctxWith({ requestRejection: () => 401 })), { url, socket: lan, headers: own })).status, 401)
+  assert.equal((await request(route(ctxWith({ requestRejection: () => 403 })), { url, socket: lan, headers: own })).status, 403)
+  // Logged in, from the page itself.
+  const seen = []
+  const accepted = await request(route(ctxWith({ requestRejection: req => { seen.push(req.headers.host) } })), { url, socket: lan, headers: own })
+  assert.equal(accepted.status, 200)
+  assert.deepEqual(seen, ['192.168.1.113:33081'])
+  // Logged in but another site's origin.
+  assert.equal((await request(route(ctxWith({ requestRejection: () => undefined })), { url, socket: lan, headers: { ...own, origin: 'http://evil.example' } })).status, 403)
+  // Loopback: no DSH check, the page origin rule as before.
+  const local = { remoteAddress: '127.0.0.1' }
+  assert.equal((await request(route(), { url, socket: local, headers: {} })).status, 200)
+  assert.equal((await request(route(), { url, socket: local, headers: { origin: 'http://192.168.1.113:33081', host: '192.168.1.113:33081' } })).status, 403)
+})
