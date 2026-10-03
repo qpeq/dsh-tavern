@@ -920,8 +920,25 @@
 					React.createElement(TavernRollbackAction, props),
                     React.createElement(TavernUndoRollbackAction, props),
 					React.createElement(TavernCompactionAction, Object.assign({}, props, { inMenu: true })),
+					React.createElement(TavernNewChatActions, props),
 					React.createElement(TavernIndicatorsToggle, null))
 			);
+		}
+
+		// Fork: start a new chat with this chat's character card (the sidebar opens its opening picker, see
+		// "dsh-tavern-new-chat-same-card" in sidebar.js); "and replace" also deletes this chat once the new one starts.
+		function TavernNewChatActions(props) {
+			const askConfirm = useTavernConfirm(props.sessionId);
+			function start(replace) {
+				window.dispatchEvent(new CustomEvent("dsh-tavern-new-chat-same-card", { detail: { sessionId: props.sessionId, replace: replace } }));
+			}
+			async function replace() {
+				if (!await askConfirm("Start a new chat with this character card and delete this chat?\nThis chat is deleted once the new one has started (choose its opening first). Deleted chats can't be restored.")) return;
+				start(true);
+			}
+			return React.createElement(React.Fragment, null,
+				React.createElement("button", { type: "button", role: "menuitem", title: "New chat with this character card", onClick: function () { start(false); } }, "New chat"),
+				React.createElement("button", { type: "button", role: "menuitem", className: "danger", title: "New chat with this character card, then delete this chat", onClick: replace }, "New chat and replace"));
 		}
 
 		// Fork: the global "hide context and reasoning" display preference, also reachable from the play menu.

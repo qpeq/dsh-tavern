@@ -108,6 +108,7 @@
 			const playWorkspaceResolverRef = React.useRef(null);
 			const playPrewarmRef = React.useRef(null);
             const startAttemptsRef = React.useRef(null);
+            const replaceAfterStartRef = React.useRef(null); // fork: {cardPath, item} of the chat "New chat and replace" deletes
             if (!startAttemptsRef.current) startAttemptsRef.current = createConversationAttemptStore(window.localStorage);
 			const sessionListRecoveryRef = React.useRef(null);
 			playWorkspaceIdRef.current = workspaceId;
@@ -313,6 +314,7 @@
 			async function discardOpening() {
 				if (busy || !await askConfirm("放弃本次开局？已填写的选项将被清除。")) return;
 				const id = openingPicker && openingPicker.preparationId;
+				replaceAfterStartRef.current = null;
 				playPrewarmRef.current.cancel();
 				setChatImport(null);
 				setOpeningPicker(null);
@@ -528,11 +530,18 @@
 					if (initialMessage) await timing.measure("submitInitialMessage", () => props.executeSlash("/send " + substituteTavernIdentityMacros(initialMessage, { playerName: resolvedUserName, characterName: card && card.name }) + "|/trigger", created.sessionId));
 					if (targetMode !== "card") window.localStorage.setItem("dsh-tavern-player-name", resolvedUserName);
 					successful = true;
+					const replace = replaceAfterStartRef.current;
+					if (replace && card && replace.cardPath === card.path) {
+						replaceAfterStartRef.current = null;
+						try { await deleteReplacedChat(replace.item); }
+						catch (deleteError) { setError("New chat started, but deleting the old chat failed: " + String(deleteError && deleteError.message || deleteError)); }
+					}
 					console.info("dsh-tavern: 开始游戏完成", (Date.now() - startedAt) + "ms", preparedWorkspaceId ? "工作区已就绪" : "即时创建");
 				} catch (err) { if (!created) setOpeningPicker(previousOpeningPicker); setError((created ? "游戏已创建，开局消息发送失败：" : String(err && err.phase || "创建对话") + "失败：") + String(err && err.message || err)); if (initialMessage) throw err; }
 				finally { timing.finish(successful); tavernSessionTransition.end(); setBusy(false); }
 			}
 			async function preparePlayConversation(card) {
+				replaceAfterStartRef.current = null;
 				setBusy(true); setError("");
                 const timing = typeof openingPerformance !== "undefined" ? openingPerformance.begin("preparePreview") : null;
                 let successful = false;
@@ -609,6 +618,36 @@
 				window.addEventListener("dsh-tavern-edit-preset", onEditPreset);
 				return function () { window.removeEventListener("dsh-tavern-edit-preset", onEditPreset); };
 			});
+			// Fork: "New chat" / "New chat and replace" from the play menu (更多). Opens the opening picker for the
+			// current chat's card, like 选择人物卡 · 新开游玩 without the card step; with replace, that chat is
+			// deleted once the new one has started (newConversation). Discarding the opening cancels it.
+			React.useEffect(function () {
+				function onNewChatSameCard(event) {
+					const detail = event && event.detail || {};
+					if (!detail.sessionId) return;
+					if (busy) { setError("Busy, try again in a moment"); return; }
+					const item = history.find(function (entry) { return entry.sessionId === detail.sessionId; });
+					Promise.resolve().then(async function () {
+						const target = await call("getPlayChatDebugTarget", { sessionId: detail.sessionId });
+						if (!target || !target.card || !target.card.path) throw new Error("this chat has no character card");
+						if (collapsed) { props.toggleSidebar(); await new Promise(function (resolve) { window.setTimeout(resolve, 180); }); }
+						if (uiMode !== "play") setUiMode("play");
+						setMenuSession(null); setCardEntry(""); setError(""); setPicking(true);
+						await preparePlayConversation(target.card);
+						replaceAfterStartRef.current = detail.replace && item ? { cardPath: target.card.path, item: item } : null;
+					}).catch(function (error) { setError("New chat failed: " + String(error && error.message || error)); });
+				}
+				window.addEventListener("dsh-tavern-new-chat-same-card", onNewChatSameCard);
+				return function () { window.removeEventListener("dsh-tavern-new-chat-same-card", onNewChatSameCard); };
+			});
+			async function deleteReplacedChat(item) {
+				const prepared = await call("prepareDeleteChats", { chatIds: [item.chatId] });
+				if (!prepared.results[0].ok) throw new Error(prepared.results[0].error);
+				try { await props.archiveSession(item.sessionId); }
+				catch (archiveError) { if (!isMissingSessionArchiveError(archiveError)) throw archiveError; }
+				await call("deleteChat", { chatId: item.chatId });
+				await refresh();
+			}
 			function formatTime(ts) {
 				if (!ts) return "";
 				const d = new Date(ts); return (d.getMonth() + 1) + "/" + d.getDate() + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
