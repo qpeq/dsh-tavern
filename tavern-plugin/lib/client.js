@@ -10797,8 +10797,8 @@ function subscribeTavernHostTheme(win, listener) {
 			const section = (title, ...children) => h("section", { className: "dsh-tavern-status-section", style: { display: "grid", gap: "10px", minWidth: 0 } }, h("div", { className: "dsh-tavern-status-label" }, title), ...children);
 			return h("div", { className: "dsh-tavern-persona-panel", style: { display: "grid", gap: "4px", minWidth: 0, paddingBottom: "12px", marginBottom: "18px", borderBottom: "1px solid var(--dsw-alias-border-l2)" } },
 				section("Player persona · this game",
-					h("div", { style: { display: "grid", gridTemplateColumns: "96px minmax(0, 1fr)", gap: "14px", alignItems: "center" } },
-						h(PersonaPortrait, { src: current && library.portraits[current.id], name: current ? current.name : "", size: 96 }),
+					h("div", { style: { display: "grid", gap: "12px", justifyItems: "start", minWidth: 0 } },
+						h(PersonaPortrait, { src: current && library.portraits[current.id], name: current ? current.name : "", size: 200 }),
 						h("select", { className: "dsh-tavern-settings-select", "aria-label": "Player persona for this game", value: current ? current.id : "", disabled: current === undefined || busy || !library.loaded, style: PERSONA_FULL, onChange: event => choose(event.target.value) },
 							h("option", { value: "" }, "No persona"),
 							current && !known ? h("option", { value: current.id }, current.name + " (deleted from the library)") : null,
@@ -10809,8 +10809,8 @@ function subscribeTavernHostTheme(win, listener) {
 						h("select", { className: "dsh-tavern-settings-select", disabled: busy || !library.loaded, value: library.defaultId, style: PERSONA_FULL, onChange: event => update({ defaultPersonaId: event.target.value }) },
 							h("option", { value: "" }, "No persona"), options())),
 					library.error ? h("p", { role: "alert", className: "dsh-card-error" }, library.error) : null,
-					h("ul", { style: { listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "10px", minWidth: 0 } }, personas.map(item => h("li", { key: item.id, style: { display: "grid", gridTemplateColumns: "64px minmax(0, 1fr)", gap: "14px", alignItems: "start", minWidth: 0 } },
-						h(PersonaPortrait, { src: library.portraits[item.id], name: item.name, size: 64 }),
+					h("ul", { style: { listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "10px", minWidth: 0 } }, personas.map(item => h("li", { key: item.id, style: { display: "grid", gridTemplateColumns: "96px minmax(0, 1fr)", gap: "14px", alignItems: "start", minWidth: 0 } },
+						h(PersonaPortrait, { src: library.portraits[item.id], name: item.name, size: 96 }),
 						h("div", { style: { display: "grid", gap: "2px", minWidth: 0 } },
 							h("div", { style: { fontWeight: 600, fontSize: "13px", overflowWrap: "anywhere" } }, personaLabel(item, personas)),
 							h("div", { style: { fontSize: "12px", lineHeight: 1.5, opacity: .7, overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" } }, item.description ? item.description.replace(/\s+/g, " ").slice(0, 300) : "(no description)"),
@@ -14983,7 +14983,6 @@ function subscribeTavernHostTheme(win, listener) {
 			function TavernStatusPanel(props) {
             const askConfirm = useTavernConfirm(props.sessionId || props.scope?.sessionId);
 			const [error, setError] = usePersistentError("酒馆状态");
-			const [personaOpen, setPersonaOpen] = React.useState(false), [personaMounted, setPersonaMounted] = React.useState(false);
 			const [guideDraft, setGuideDraft] = React.useState("");
 			const guideInputRef = React.useRef(null);
 			const [guideBusy, setGuideBusy] = React.useState(false);
@@ -15137,13 +15136,12 @@ function subscribeTavernHostTheme(win, listener) {
                     h("nav", { className: "dsh-tavern-status-resource-links", "aria-label": "本局资料" },
                         h("button", { type: "button", disabled: !view.card.path, onClick: () => props.openStyleTab("dsh-tavern:cards", { cardPath: view.card.path }) }, "打开人物卡 ↗"),
                         h("button", { type: "button", disabled: !view.card.path || resourceLinkBusy || !currentResourceBinding || noWorldBook || unavailableWorldBook, title: "打开本局人物卡绑定的世界书；多本绑定时打开主世界书", onClick: openWorldBookDetail }, resourceLinkBusy ? "正在打开…" : !currentResourceBinding ? "正在读取世界书…" : noWorldBook ? "未绑定世界书" : unavailableWorldBook ? "世界书不可用" : "打开世界书 ↗"),
-                        h("button", { type: "button", "aria-expanded": personaOpen, title: "Player persona for this game, and the persona library", onClick: () => { setPersonaMounted(true); setPersonaOpen(open => !open); } }, personaOpen ? "Persona ▴" : "Persona ▾")),
+                        h("button", { type: "button", title: "Player persona for this game, and the persona library", onClick: () => props.openStyleTab("dsh-tavern:persona", {}) }, "Persona ↗")),
                     resourceLinkError ? h("div", { className: "dsh-card-error", role: "status" }, resourceLinkError) : null,
 					(view.card.tags || []).length ? h("div", { className: "dsh-tavern-status-tags" }, (view.card.tags || []).slice(0, 8).map(function (tag) { return h("span", { key: tag, className: "dsh-tavern-status-tag" }, tag); })) : null,
 					h("div", { className: "dsh-tavern-status-settle" }, h("span", { className: "dsh-tavern-status-dot " + (view.settleStatus || "idle") }), statusText)
 				),
 					h("div", { className: "dsh-tavern-status-body" },
-                        h("div", { key: "persona", hidden: !personaOpen }, personaMounted ? h(TavernPersonaPanel, { key: props.sessionId, sessionId: props.sessionId }) : null),
                         h(TavernBackgroundWait, {sessionId:props.sessionId, activity:view.activity}),
                         h(TavernStorageMigration, {key:props.sessionId,sessionId:props.sessionId,busy:running || view.activity?.busy || view.settleStatus === "running"}),
 					["story", "script"].includes(view.mode || "story") && view.requestMode !== "sillytavern" && view.cardUpdate ? h("section", { className: "dsh-tavern-status-section" },
@@ -16211,6 +16209,20 @@ function subscribeTavernHostTheme(win, listener) {
 					return React.createElement(TavernStatusTab, { sessions: ctx.sessions, uiConversation: uiConversation, sessionId: props.scope.sessionId, executeSlash: executeSlash, openStyleTab: function (type, meta) { openTavernSidebarTab(ctx, { type: type, meta: meta }, { sessionId: props.scope.sessionId }); } });
 				}
 			}), "dsh-tavern: Better Sidebar status tab");
+			// Fork: the player persona of this game and the persona library, opened by "Persona ↗" in 酒馆状态.
+			ctx.effect(() => ctx.betterSidebar.registerTab({
+				id: "dsh-tavern:persona",
+				title: "Persona",
+				order: 8,
+				single: true,
+				component: function (props) {
+					const sessionId = props.scope.sessionId;
+					return React.createElement("aside", { className: "dsh-tavern-status dsh-tavern-persona-tab" },
+						React.createElement("div", { className: "dsh-tavern-status-body" },
+							sessionId ? React.createElement(TavernPersonaPanel, { key: sessionId, sessionId: sessionId })
+								: React.createElement("div", { className: "dsh-tavern-status-empty" }, "Open a game to choose its persona.")));
+				}
+			}), "dsh-tavern: Better Sidebar persona tab");
 			ctx.effect(() => slots.inject("conversation.session.header.utilities", () => slots.register(
 				{ name: "conversation.session.header.utilities", id: "dsh-tavern-conversation-export", order: 90 },
 				function (props) { return React.createElement(TavernConversationExportAction, Object.assign({}, props, { sessions: ctx.sessions })); }
